@@ -7,12 +7,13 @@ const db      = require('../config/database');
 const { success, error, serverError } = require('../utils/response');
 
 // ── 数据类型元信息 ──────────────────────────────────────────────
+// kind: organization | course_offerings | grades | table
 const ACADEMIC_TYPES = {
-  schools:     { label: '学校/学院/专业', table: 'colleges' },
-  students:    { label: '学生信息',       table: 'students' },
-  courses:     { label: '课程开设数据',   table: 'courses' },
-  curriculum:  { label: '培养方案数据',   table: 'curriculum_versions' },
-  grades:      { label: '学生成绩',       table: 'scores' },
+  schools:     { label: '学校/学院/专业', kind: 'organization' },
+  students:    { label: '学生信息',       kind: 'table', table: 'students' },
+  courses:     { label: '课程开设数据',   kind: 'course_offerings' },
+  curriculum:  { label: '培养方案数据',   kind: 'table', table: 'curriculum_versions' },
+  grades:      { label: '学生成绩',       kind: 'grades' },
 };
 
 const LMS_TYPES = {
@@ -25,9 +26,72 @@ const LMS_TYPES = {
 // ── 工具：安全读取计数 ──────────────────────────────────────────
 function tableCount(table) {
   try {
-    return db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get().n;
+    const row = db.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get();
+    return row?.count ?? 0;
   } catch {
     return 0;
+  }
+}
+
+/** 学校 / 学院 / 专业 分表统计（一次查询，避免与 node:sqlite 单行结果字段不一致） */
+function organizationCounts() {
+  try {
+    const row = db.prepare(`
+      SELECT
+        (SELECT COUNT(*) FROM schools)  AS schools,
+        (SELECT COUNT(*) FROM colleges) AS colleges,
+        (SELECT COUNT(*) FROM majors)   AS majors
+    `).get();
+    return {
+      schools:  row?.schools ?? 0,
+      colleges: row?.colleges ?? 0,
+      majors:   row?.majors ?? 0,
+    };
+  } catch {
+    return { schools: 0, colleges: 0, majors: 0 };
+  }
+}
+
+function organizationTotalRecords() {
+  const o = organizationCounts();
+  return o.schools + o.colleges + o.majors;
+}
+
+/** 培养方案课程(courses) + 实际开课(teaching_classes)，与「开设」语义一致 */
+function courseOfferingCounts() {
+  try {
+    const row = db.prepare(`
+      SELECT
+        (SELECT COUNT(*) FROM courses)           AS planCourses,
+        (SELECT COUNT(*) FROM teaching_classes) AS teachingClasses
+    `).get();
+    return {
+      planCourses:     row?.planCourses ?? 0,
+      teachingClasses: row?.teachingClasses ?? 0,
+    };
+  } catch {
+    return { planCourses: 0, teachingClasses: 0 };
+  }
+}
+
+function courseOfferingTotalRecords() {
+  const c = courseOfferingCounts();
+  return c.planCourses + c.teachingClasses;
+}
+
+/** 卡片「学生成绩」对应 scores 表：学生×考核项 得分记录 */
+function academicRecordCount(meta) {
+  switch (meta.kind) {
+    case 'organization':
+      return organizationTotalRecords();
+    case 'course_offerings':
+      return courseOfferingTotalRecords();
+    case 'grades':
+      return tableCount('scores');
+    case 'table':
+      return tableCount(meta.table);
+    default:
+      return 0;
   }
 }
 
@@ -46,13 +110,24 @@ router.get('/status', (req, res) => {
       result[src] = row || { status: null, created_at: null, total_records: 0, sync_count: 0 };
     });
 
-    // 各业务表现有记录数
-    const counts = {};
+    const org         = organizationCounts();
+    const courseOff   = courseOfferingCounts();
+    const scoreRows   = tableCount('scores');
+    const counts      = {};
     Object.entries(ACADEMIC_TYPES).forEach(([key, meta]) => {
-      counts[key] = tableCount(meta.table);
+      counts[key] = academicRecordCount(meta);
     });
+    counts.organization   = org;
+    counts.courseOfferings = courseOff;
+    counts.gradeBreakdown = { scoreRecords: scoreRows };
 
-    success(res, { sources: result, counts });
+    success(res, {
+      sources: result,
+      counts,
+      structureCounts: org,
+      courseOfferings: courseOff,
+      gradeBreakdown:  { scoreRecords: scoreRows },
+    });
   } catch (err) {
     serverError(res, err.message);
   }
@@ -67,7 +142,7 @@ router.post('/academic/sync', (req, res) => {
     }
 
     const meta    = ACADEMIC_TYPES[dataType];
-    const records = tableCount(meta.table);
+    const records = academicRecordCount(meta);
 
     db.prepare(
       `INSERT INTO integration_sync_logs (source, data_type, status, records, triggered_by)

@@ -72,7 +72,7 @@ CREATE TABLE IF NOT EXISTS curriculum_versions (
   status      TEXT DEFAULT 'draft',
   created_at  TEXT DEFAULT (datetime('now','localtime')),
   updated_at  TEXT DEFAULT (datetime('now','localtime')),
-  UNIQUE(major_id, grade_year)
+  UNIQUE(major_id, grade_year, version)
 );
 
 -- ─────────────────────────────────────────────────
@@ -280,8 +280,45 @@ CREATE TABLE IF NOT EXISTS integration_config (
 );
 `;
 
+function migrateCurriculumVersionsUniqueConstraint() {
+  const row = db.prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='curriculum_versions'`).get();
+  if (!row || !row.sql) return;
+  const sql = row.sql;
+  if (/UNIQUE\s*\(\s*major_id\s*,\s*grade_year\s*,\s*version\s*\)/.test(sql)) return;
+  if (!/UNIQUE\s*\(\s*major_id\s*,\s*grade_year\s*\)/.test(sql)) return;
+
+  console.log('📦 迁移 curriculum_versions：唯一约束改为 (major_id, grade_year, version)…');
+  db.exec('PRAGMA foreign_keys = OFF');
+  db.exec('BEGIN');
+  try {
+    db.exec(`
+      CREATE TABLE curriculum_versions__mig (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        major_id    INTEGER NOT NULL REFERENCES majors(id) ON DELETE CASCADE,
+        version     TEXT NOT NULL,
+        grade_year  INTEGER NOT NULL,
+        status      TEXT DEFAULT 'draft',
+        created_at  TEXT DEFAULT (datetime('now','localtime')),
+        updated_at  TEXT DEFAULT (datetime('now','localtime')),
+        UNIQUE(major_id, grade_year, version)
+      );
+    `);
+    db.exec(`INSERT INTO curriculum_versions__mig SELECT * FROM curriculum_versions`);
+    db.exec(`DROP TABLE curriculum_versions`);
+    db.exec(`ALTER TABLE curriculum_versions__mig RENAME TO curriculum_versions`);
+    db.exec('COMMIT');
+  } catch (e) {
+    db.exec('ROLLBACK');
+    throw e;
+  } finally {
+    db.exec('PRAGMA foreign_keys = ON');
+  }
+  console.log('✅ curriculum_versions 表结构已更新');
+}
+
 try {
   db.exec(schema);
+  migrateCurriculumVersionsUniqueConstraint();
   console.log('✅ 数据库迁移完成');
 } catch (err) {
   console.error('❌ 数据库迁移失败:', err.message);
