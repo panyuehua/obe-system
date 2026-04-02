@@ -254,6 +254,30 @@ CREATE TABLE IF NOT EXISTS improvement_plans (
   created_at          TEXT DEFAULT (datetime('now','localtime')),
   updated_at          TEXT DEFAULT (datetime('now','localtime'))
 );
+
+-- ─────────────────────────────────────────────────
+--  数据接入中枢
+-- ─────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS integration_sync_logs (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  source       TEXT NOT NULL,
+  data_type    TEXT NOT NULL,
+  status       TEXT NOT NULL DEFAULT 'success',
+  records      INTEGER DEFAULT 0,
+  error_msg    TEXT,
+  triggered_by TEXT DEFAULT 'manual',
+  created_at   TEXT DEFAULT (datetime('now','localtime'))
+);
+
+CREATE TABLE IF NOT EXISTS integration_config (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  config_group TEXT NOT NULL,
+  config_key   TEXT NOT NULL,
+  config_value TEXT,
+  updated_at   TEXT DEFAULT (datetime('now','localtime')),
+  UNIQUE(config_group, config_key)
+);
 `;
 
 try {

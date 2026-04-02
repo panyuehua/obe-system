@@ -90,6 +90,20 @@ const api = {
     updateStatus:(id, data)  => put(`/improvement/${id}/status`, data),
     remove:      (id)        => del(`/improvement/${id}`),
   },
+
+  // ── Data Integration ──────────────────────────────────────
+  dataIntegration: {
+    status:        ()           => get('/data-integration/status'),
+    academicSync:  (dataType)   => post('/data-integration/academic/sync', { dataType }),
+    importCsv:     (type, rows) => post(`/data-integration/academic/import/${type}`, { rows }),
+    lmsConfig:     ()           => get('/data-integration/lms/config'),
+    saveLmsConfig: (data)       => put('/data-integration/lms/config', data),
+    lmsSync:       ()           => post('/data-integration/lms/sync'),
+    industryScrape:(target)     => post('/data-integration/industry/scrape', { target }),
+    industryStats: ()           => get('/data-integration/industry/stats'),
+    qualityLogs:   (params)     => get(`/data-integration/quality/logs?${new URLSearchParams(params)}`),
+    qualityStats:  ()           => get('/data-integration/quality/stats'),
+  },
 };
 
 window.api = api;
