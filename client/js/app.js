@@ -221,7 +221,6 @@ const nav = (() => {
 
         <!-- Nav -->
         <nav class="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto" aria-label="主导航">
-          <p class="nav-section-label">功能模块</p>
           ${menuItems.map((item) => {
             const isActive = item.key === activeKey;
             return `
