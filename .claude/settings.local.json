@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 \"C:\\\\Users\\\\Administrator\\\\AppData\\\\Roaming\\\\Claude\\\\local-agent-mode-sessions\\\\skills-plugin\\\\c97c0802-e3fa-4b4c-9d66-1d8effd78fd5\\\\6804a4d3-f0c4-470b-bb4f-df15cb2be79a\\\\skills\\\\ui-ux-pro-max\\\\scripts\\\\search.py\" \"enterprise education management SaaS dashboard admin data analytics\" --design-system -p \"OBE教管平台\" -f markdown)",
+      "Bash(python \"C:\\\\Users\\\\Administrator\\\\AppData\\\\Roaming\\\\Claude\\\\local-agent-mode-sessions\\\\skills-plugin\\\\c97c0802-e3fa-4b4c-9d66-1d8effd78fd5\\\\6804a4d3-f0c4-470b-bb4f-df15cb2be79a\\\\skills\\\\ui-ux-pro-max\\\\scripts\\\\search.py\" \"enterprise education management SaaS dashboard admin\" --design-system -p \"OBE教管平台\" -f markdown)",
+      "Read(//c/Users/Administrator/AppData/Roaming/Claude/local-agent-mode-sessions/skills-plugin/c97c0802-e3fa-4b4c-9d66-1d8effd78fd5/6804a4d3-f0c4-470b-bb4f-df15cb2be79a/skills/ui-ux-pro-max/**)",
+      "Bash(python scripts/search.py \"enterprise SaaS admin dashboard education\" --design-system -p \"OBE Platform\")",
+      "Bash(SKILL_DIR=\"C:/Users/Administrator/AppData/Roaming/Claude/local-agent-mode-sessions/skills-plugin/c97c0802-e3fa-4b4c-9d66-1d8effd78fd5/6804a4d3-f0c4-470b-bb4f-df15cb2be79a/skills/ui-ux-pro-max\")",
+      "Bash(python \"$SKILL_DIR/scripts/search.py\" \"enterprise SaaS admin dashboard education\" --design-system -p \"OBE Platform\")",
+      "Bash(python \"$SKILL_DIR/scripts/search.py\" \"enterprise SaaS admin dashboard education\" --domain style)",
+      "Bash(python \"$SKILL_DIR/scripts/search.py\" \"SaaS dashboard\" --domain color -n 3)",
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(python \"C:/Users/Administrator/AppData/Roaming/Claude/local-agent-mode-sessions/skills-plugin/c97c0802-e3fa-4b4c-9d66-1d8effd78fd5/6804a4d3-f0c4-470b-bb4f-df15cb2be79a/skills/ui-ux-pro-max/scripts/search.py\" --help)",
+      "Bash(dir \"C:\\\\Users\\\\Administrator\\\\AppData\\\\Roaming\\\\Claude\\\\local-agent-mode-sessions\\\\skills-plugin\\\\c97c0802-e3fa-4b4c-9d66-1d8effd78fd5\\\\6804a4d3-f0c4-470b-bb4f-df15cb2be79a\\\\skills\\\\ui-ux-pro-max\\\\scripts\")",
+      "Bash(cmd /c \"python C:\\\\Users\\\\Administrator\\\\AppData\\\\Roaming\\\\Claude\\\\local-agent-mode-sessions\\\\skills-plugin\\\\c97c0802-e3fa-4b4c-9d66-1d8effd78fd5\\\\6804a4d3-f0c4-470b-bb4f-df15cb2be79a\\\\skills\\\\ui-ux-pro-max\\\\scripts\\\\search.py \"\"enterprise SaaS admin education dashboard\"\" --design-system -p \"\"OBE Platform\"\" 2>&1\")",
+      "Bash(cmd /c \"cd /d C:\\\\Users\\\\Administrator\\\\AppData\\\\Roaming\\\\Claude\\\\local-agent-mode-sessions\\\\skills-plugin\\\\c97c0802-e3fa-4b4c-9d66-1d8effd78fd5\\\\6804a4d3-f0c4-470b-bb4f-df15cb2be79a\\\\skills\\\\ui-ux-pro-max && python scripts\\\\search.py \"\"enterprise SaaS education\"\" --domain style\")"
+    ]
+  }
+}

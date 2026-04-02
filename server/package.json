@@ -1,0 +1,22 @@
+{
+  "name": "obe-platform-server",
+  "version": "1.0.0",
+  "description": "OBE教管一体化平台 - 后端服务",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "nodemon app.js",
+    "migrate": "node db/migrate.js",
+    "seed": "node db/seed.js",
+    "reset-db": "node db/migrate.js && node db/seed.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "express-validator": "^7.0.1",
+    "morgan": "^1.10.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  }
+}

@@ -1,0 +1,8 @@
+/*
+ * 此文件为根目录备份，不被服务器加载。
+ * 实际使用的设计系统文件位于：
+ *   client/css/design-system.css
+ *
+ * Express 静态文件根目录为 client/，
+ * HTML 中的 /css/design-system.css 指向 client/css/design-system.css。
+ */

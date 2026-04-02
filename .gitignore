@@ -1,0 +1,31 @@
+# Node.js 依赖
+node_modules/
+server/node_modules/
+
+# 数据库文件（SQLite WAL 临时文件）
+server/db/data/*.db-shm
+server/db/data/*.db-wal
+
+# 环境变量配置
+.env
+.env.local
+.env.*.local
+
+# 日志文件
+logs/
+*.log
+npm-debug.log*
+
+# 系统文件
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 编辑器缓存
+.vscode/settings.json
+*.suo
+*.user
+
+# 构建输出
+dist/
+build/

@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>诊断报告 — OBE教管平台</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/css/design-system.css" />
+  <style>
+    .issue-card { border-radius: var(--radius-lg); border: 1px solid; padding: 14px 16px; display: flex; align-items: flex-start; gap: 12px; }
+    .issue-card.error   { background: #fef2f2; border-color: #fecaca; }
+    .issue-card.warning { background: #fffbeb; border-color: #fde68a; }
+    .issue-icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .issue-icon.error   { background: #fee2e2; color: #b91c1c; }
+    .issue-icon.warning { background: #fef3c7; color: #92400e; }
+    .rule-item.error    { background: #fef2f2; border: 1px solid #fecaca; }
+    .rule-item.warning  { background: #fffbeb; border: 1px solid #fde68a; }
+    .rule-item.error   .rule-label { font-size: 12px; font-weight: 700; color: #991b1b; }
+    .rule-item.warning .rule-label { font-size: 12px; font-weight: 700; color: #92400e; }
+    .rule-item.error   .rule-desc  { font-size: 11px; color: #b91c1c; margin-top: 2px; line-height: 1.5; }
+    .rule-item.warning .rule-desc  { font-size: 11px; color: #a16207; margin-top: 2px; line-height: 1.5; }
+  </style>
+</head>
+<body>
+<div class="flex h-screen overflow-hidden">
+  <aside id="sidebar" class=""></aside>
+  <main class="flex-1 flex flex-col overflow-hidden">
+
+    <header class="page-header">
+      <div>
+        <h1 class="page-title">诊断报告</h1>
+        <p class="page-subtitle">自动检测培养方案中的结构性逻辑问题</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <select id="version-select" class="form-select" style="min-height:40px;padding-top:8px;padding-bottom:8px;min-width:220px">
+          <option value="">选择培养方案版本</option>
+        </select>
+        <button id="btn-diagnose" onclick="runDiagnosis()" class="btn btn-primary" disabled>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          运行诊断
+        </button>
+      </div>
+    </header>
+
+    <div class="flex-1 overflow-y-auto p-6 page-enter">
+
+      <div id="empty-state" class="card">
+        <div class="empty-state">
+          <div class="empty-state-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          </div>
+          <p class="empty-state-title">选择培养方案后运行诊断</p>
+          <p class="empty-state-desc">系统将自动扫描支撑孤岛、权重失衡、真空指标等5类结构性问题</p>
+        </div>
+      </div>
+
+      <div id="results" class="hidden space-y-5">
+
+        <div id="health-banner" class="flex items-center gap-4 rounded-2xl px-6 py-4"></div>
+
+        <div class="grid grid-cols-3 gap-4" id="summary-cards"></div>
+
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--color-primary-500)"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+              诊断规则说明
+            </span>
+          </div>
+          <div class="card-body">
+            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+              <div class="flex items-start gap-3 px-3 py-2.5 rounded-xl rule-item error">
+                <div class="issue-icon error" style="width:28px;height:28px;flex-shrink:0;margin-top:1px">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                </div>
+                <div><p class="rule-label">支撑孤岛</p><p class="rule-desc">指标点无任何课程支撑，无法计算达成度</p></div>
+              </div>
+              <div class="flex items-start gap-3 px-3 py-2.5 rounded-xl rule-item error">
+                <div class="issue-icon error" style="width:28px;height:28px;flex-shrink:0;margin-top:1px">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                </div>
+                <div><p class="rule-label">目标孤岛</p><p class="rule-desc">培养目标未关联任何毕业要求</p></div>
+              </div>
+              <div class="flex items-start gap-3 px-3 py-2.5 rounded-xl rule-item warning">
+                <div class="issue-icon warning" style="width:28px;height:28px;flex-shrink:0;margin-top:1px">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                </div>
+                <div><p class="rule-label">无课程目标</p><p class="rule-desc">课程已开设但未配置ILO，无法采集达成数</p></div>
+              </div>
+              <div class="flex items-start gap-3 px-3 py-2.5 rounded-xl rule-item warning">
+                <div class="issue-icon warning" style="width:28px;height:28px;flex-shrink:0;margin-top:1px">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                </div>
+                <div><p class="rule-label">支撑权重偏低</p><p class="rule-desc">指标点课程支撑总权重不足，建议≥0.5</p></div>
+              </div>
+              <div class="flex items-start gap-3 px-3 py-2.5 rounded-xl rule-item warning">
+                <div class="issue-icon warning" style="width:28px;height:28px;flex-shrink:0;margin-top:1px">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                </div>
+                <div><p class="rule-label">权重求和异常</p><p class="rule-desc">二级指标点权重之和偏差≥0.05</p></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--color-primary-500)"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+              问题清单
+            </span>
+            <div class="flex items-center gap-2" id="issue-filter">
+              <button class="tab-item active" onclick="filterIssues('all', this)" style="min-height:32px">全部</button>
+              <button class="tab-item" onclick="filterIssues('error', this)" style="min-height:32px">错误</button>
+              <button class="tab-item" onclick="filterIssues('warning', this)" style="min-height:32px">警告</button>
+            </div>
+          </div>
+          <div id="issues-list" class="card-body space-y-3"></div>
+        </div>
+
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="/js/api.js"></script>
+<script src="/js/app.js"></script>
+<script>
+  nav.render('diagnosis');
+  let allIssues = [];
+
+  async function initVersionSelect() {
+    const majors = await api.majors.list();
+    const sel = document.getElementById('version-select');
+    for (const m of majors) {
+      const vs = await api.curriculum.versions(m.id);
+      vs.forEach(v => {
+        const o = document.createElement('option');
+        o.value = v.id;
+        o.textContent = `${m.name} · ${v.grade_year}级`;
+        sel.appendChild(o);
+      });
+    }
+    sel.addEventListener('change', () => {
+      document.getElementById('btn-diagnose').disabled = !sel.value;
+    });
+  }
+
+  async function runDiagnosis() {
+    const vId = document.getElementById('version-select').value;
+    if (!vId) return;
+    const btn = document.getElementById('btn-diagnose');
+    setLoading(btn, true);
+    try {
+      const data = await api.analysis.diagnosis(vId);
+      allIssues = data.issues || [];
+      document.getElementById('empty-state').classList.add('hidden');
+      document.getElementById('results').classList.remove('hidden');
+      renderHealthBanner(data.summary);
+      renderSummaryCards(data.summary);
+      renderIssues(allIssues);
+    } catch(e) {
+      toast.error('诊断失败：' + e.message);
+    } finally {
+      setLoading(btn, false);
+    }
+  }
+
+  function renderHealthBanner(summary) {
+    const el = document.getElementById('health-banner');
+    if (summary.healthy) {
+      el.style.cssText = 'background:#ecfdf5;border:1px solid #a7f3d0';
+      el.innerHTML = `
+        <div style="width:44px;height:44px;border-radius:12px;background:#d1fae5;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
+        <div>
+          <p style="font-size:15px;font-weight:700;color:#065f46">培养方案结构健康</p>
+          <p style="font-size:13px;color:#047857;margin-top:2px">未发现任何结构性问题，方案逻辑完整、支撑关系完整</p>
+        </div>`;
+    } else {
+      el.style.cssText = `background:${summary.errors>0?'#fef2f2':'#fffbeb'};border:1px solid ${summary.errors>0?'#fca5a5':'#fde68a'}`;
+      el.innerHTML = `
+        <div style="width:44px;height:44px;border-radius:12px;background:${summary.errors>0?'#fee2e2':'#fef3c7'};display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="${summary.errors>0?'#b91c1c':'#92400e'}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        </div>
+        <div>
+          <p style="font-size:15px;font-weight:700;color:${summary.errors>0?'#991b1b':'#92400e'}">发现 ${summary.total} 个结构性问题</p>
+          <p style="font-size:13px;color:${summary.errors>0?'#b91c1c':'#a16207'};margin-top:2px">包含 ${summary.errors} 个错误，${summary.warnings} 个警告，请按优先级逐一修复</p>
+        </div>`;
+    }
+  }
+
+  function renderSummaryCards(summary) {
+    document.getElementById('summary-cards').innerHTML = [
+      { label:'错误',   value:summary.errors,   color:'#b91c1c', bg:'#fee2e2' },
+      { label:'警告',   value:summary.warnings, color:'#92400e', bg:'#fef3c7' },
+      { label:'问题总计', value:summary.total,  color:summary.healthy?'#065f46':'#374151', bg:summary.healthy?'#d1fae5':'var(--color-neutral-100)' },
+    ].map(s => `
+      <div class="stat-card">
+        <div class="stat-icon mb-2" style="background:${s.bg}">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${s.color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        </div>
+        <div class="stat-value" style="color:${s.color}">${s.value}</div>
+        <div class="stat-label">${s.label}</div>
+      </div>
+    `).join('');
+  }
+
+  function filterIssues(level, btn) {
+    document.querySelectorAll('#issue-filter .tab-item').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const filtered = level === 'all' ? allIssues : allIssues.filter(i => i.level === level);
+    renderIssues(filtered);
+  }
+
+  function renderIssues(issues) {
+    const el = document.getElementById('issues-list');
+    if (!issues.length) {
+      el.innerHTML = `<div class="empty-state" style="padding:32px 0"><div class="empty-state-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div><p class="empty-state-title">无匹配问题</p></div>`;
+      return;
+    }
+    el.innerHTML = issues.map(issue => `
+      <div class="issue-card ${issue.level}">
+        <div class="issue-icon ${issue.level}">
+          ${issue.level === 'error'
+            ? `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`
+            : `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`
+          }
+        </div>
+        <div class="flex-1">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="badge ${issue.level==='error'?'badge-error':'badge-warning'}">${issue.level==='error'?'错误':'警告'}</span>
+            <code style="font-size:11px;color:var(--color-neutral-500);background:rgba(0,0,0,0.05);padding:1px 6px;border-radius:4px">${issue.code}</code>
+          </div>
+          <p style="font-size:13px;color:${issue.level==='error'?'#7f1d1d':'#78350f'};line-height:1.6">${issue.message}</p>
+          ${issue.target ? `<p style="font-size:11px;color:var(--color-neutral-400);margin-top:4px">关联对象 ${issue.target.type} · ${issue.target.code}</p>` : ''}
+        </div>
+        <a href="${getFixLink(issue)}" class="btn btn-secondary btn-sm flex-shrink-0" style="align-self:center">前往修复</a>
+      </div>
+    `).join('');
+  }
+
+  function getFixLink(issue) {
+    if (issue.type === 'unsupported_indicator' || issue.type === 'low_support_weight') return '/pages/matrix.html';
+    if (issue.type === 'unsupported_objective') return '/pages/curriculum.html';
+    if (issue.type === 'no_ilo') return '/pages/courses.html';
+    return '/pages/curriculum.html';
+  }
+
+  initVersionSelect();
+</script>
+</body>
+</html>

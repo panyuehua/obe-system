@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>培养方案 —OBE教管平台</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/css/design-system.css" />
+</head>
+<body>
+<div class="flex h-screen overflow-hidden">
+  <aside id="sidebar" class=""></aside>
+  <main class="flex-1 flex flex-col overflow-hidden">
+
+    <header class="page-header">
+      <div>
+        <h1 class="page-title">培养方案</h1>
+        <p class="page-subtitle">管理培养目标、毕业要求与指标</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <select id="major-select" onchange="onMajorChange()" class="form-select" style="min-height:40px;padding-top:8px;padding-bottom:8px;min-width:160px">
+          <option value="">选择专业—/option>
+        </select>
+        <select id="version-select" onchange="onVersionChange()" class="form-select" style="min-height:40px;padding-top:8px;padding-bottom:8px;min-width:160px">
+          <option value="">选择届次—/option>
+        </select>
+        <button id="btn-add-gr" onclick="addGR()" class="btn btn-primary" disabled>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          添加毕业要求
+        </button>
+      </div>
+    </header>
+
+    <div class="flex-1 overflow-y-auto p-6 page-enter">
+
+      <!-- Empty state -->
+      <div id="empty-state" class="card">
+        <div class="empty-state">
+          <div class="empty-state-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="4" rx="1"/><path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="12" y2="16"/></svg>
+          </div>
+          <p class="empty-state-title">请选择专业和培养方案版</p>
+          <p class="empty-state-desc">从上方下拉框中选择专业和届次，或先在「专业管理」中创建专业</p>
+          <a href="/pages/majors.html" class="btn btn-secondary btn-sm mt-2">前往专业管理</a>
+        </div>
+      </div>
+
+      <!-- Content -->
+      <div id="curriculum-content" class="hidden space-y-5">
+
+        <!-- Stats bar -->
+        <div id="stats-bar" class="grid grid-cols-2 md:grid-cols-4 gap-3"></div>
+
+        <!-- Training Objectives -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--color-primary-500)"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              培养目标
+            </span>
+            <button onclick="addObjective()" class="btn btn-secondary btn-sm">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              添加目标
+            </button>
+          </div>
+          <div id="objectives-list" class="card-body space-y-2"></div>
+        </div>
+
+        <!-- Graduation Requirements -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--color-primary-500)"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              毕业要求与指标点
+            </span>
+            <div class="flex items-center gap-2">
+              <span id="gr-health" class="badge badge-neutral"></span>
+              <button onclick="addGR()" class="btn btn-secondary btn-sm">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                添加毕业要求
+              </button>
+            </div>
+          </div>
+          <div id="gr-list" class="divide-y" style="border-top:1px solid var(--color-border-subtle)"></div>
+        </div>
+
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="/js/api.js"></script>
+<script src="/js/app.js"></script>
+<script>
+  nav.render('curriculum');
+  let currentVersionId = null;
+
+  async function init() {
+    const majors = await api.majors.list();
+    const sel = document.getElementById('major-select');
+    majors.forEach(m => {
+      const o = document.createElement('option');
+      o.value = m.id; o.textContent = m.name; sel.appendChild(o);
+    });
+    const params = new URLSearchParams(location.search);
+    if (params.get('major_id')) { sel.value = params.get('major_id'); onMajorChange(); }
+  }
+
+  async function onMajorChange() {
+    const majorId = document.getElementById('major-select').value;
+    if (!majorId) return;
+    const versions = await api.curriculum.versions(majorId);
+    const sel = document.getElementById('version-select');
+    sel.innerHTML = '<option value="">选择届次—/option>';
+    versions.forEach(v => {
+      const o = document.createElement('option');
+      o.value = v.id;
+      o.textContent = `${v.grade_year}级 · ${v.version}${v.status==='active'?' （启用）':''}`;
+      sel.appendChild(o);
+    });
+    if (versions.length) { sel.value = versions[0].id; onVersionChange(); }
+  }
+
+  async function onVersionChange() {
+    const vId = document.getElementById('version-select').value;
+    const isEmpty = !vId;
+    document.getElementById('empty-state').classList.toggle('hidden', !isEmpty);
+    document.getElementById('curriculum-content').classList.toggle('hidden', isEmpty);
+    document.getElementById('btn-add-gr').disabled = isEmpty;
+    if (!vId) return;
+    currentVersionId = vId;
+    await loadCurriculum(vId);
+  }
+
+  async function loadCurriculum(vId) {
+    try {
+      const data = await api.curriculum.getVersion(vId);
+      renderStats(data);
+      renderObjectives(data.objectives || []);
+      renderGR(data.graduationRequirements || []);
+    } catch(e) { toast.error(e.message); }
+  }
+
+  function renderStats(data) {
+    const grs = data.graduationRequirements || [];
+    const indicators = grs.flatMap(g => g.indicators || []);
+    document.getElementById('stats-bar').innerHTML = [
+      { label:'培养目标', value:(data.objectives||[]).length, color:'var(--color-primary-600)', bg:'var(--color-primary-50)' },
+      { label:'毕业要求', value:grs.length,                   color:'#7c3aed', bg:'#f5f3ff' },
+      { label:'指标点数', value:indicators.length,            color:'#0891b2', bg:'#ecfeff' },
+      { label:'课程数量', value:(data.courses||[]).length,    color:'#059669', bg:'#ecfdf5' },
+    ].map(s => `
+      <div class="stat-card" style="padding:14px 16px">
+        <div class="stat-icon mb-2" style="background:${s.bg}">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${s.color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/></svg>
+        </div>
+        <div class="stat-value" style="font-size:1.5rem">${s.value}</div>
+        <div class="stat-label">${s.label}</div>
+      </div>
+    `).join('');
+  }
+
+  function renderObjectives(objectives) {
+    const el = document.getElementById('objectives-list');
+    if (!objectives.length) {
+      el.innerHTML = `<p style="font-size:13px;color:var(--color-neutral-400);text-align:center;padding:16px 0">暂无培养目标，点击右上角添加</p>`;
+      return;
+    }
+    el.innerHTML = objectives.map(o => `
+      <div class="flex items-start gap-3 px-4 py-3 rounded-xl" style="background:var(--color-neutral-50);border:1px solid var(--color-border-subtle)">
+        <span style="flex-shrink:0;width:24px;height:24px;border-radius:6px;background:var(--color-primary-100);color:var(--color-primary-700);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;margin-top:1px">${o.code}</span>
+        <p style="flex:1;font-size:13px;color:var(--color-neutral-700);line-height:1.7">${o.description}</p>
+      </div>
+    `).join('');
+  }
+
+  function renderGR(grs) {
+    const el = document.getElementById('gr-list');
+    if (!grs.length) {
+      el.innerHTML = `<div class="empty-state" style="padding:32px 24px"><div class="empty-state-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div><p class="empty-state-title">暂无毕业要求</p><p class="empty-state-desc">点击「添加毕业要求」开始配</p></div>`;
+      document.getElementById('gr-health').textContent = '';
+      return;
+    }
+
+    const total = grs.reduce((s,g) => s+(g.indicators||[]).length, 0);
+    document.getElementById('gr-health').textContent = `${grs.length} 条要求 · ${total} 个指标点`;
+    document.getElementById('gr-health').className = 'badge badge-primary';
+
+    el.innerHTML = grs.map(gr => `
+      <div>
+        <div class="flex items-start gap-3 px-5 py-3" style="background:var(--color-primary-50)">
+          <span style="flex-shrink:0;padding:2px 8px;border-radius:6px;background:var(--color-primary-600);color:#fff;font-size:11px;font-weight:700;margin-top:2px">${gr.code}</span>
+          <p style="flex:1;font-size:13px;font-weight:600;color:var(--color-primary-900);line-height:1.6">${gr.description}</p>
+          <button onclick="addIndicator(${gr.id},'${gr.code}')" class="btn btn-secondary btn-sm flex-shrink-0" style="min-height:32px">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            指标点          </button>
+        </div>
+        ${(gr.indicators||[]).map(ind => `
+          <div class="flex items-start gap-3 px-5 py-2.5 hover:bg-gray-50 transition-colors" style="border-bottom:1px solid var(--color-border-subtle)">
+            <span style="flex-shrink:0;font-size:11px;color:var(--color-primary-400);font-weight:700;font-family:monospace;padding-top:2px;width:52px">${ind.code}</span>
+            <p style="flex:1;font-size:13px;color:var(--color-neutral-600);line-height:1.6">${ind.description}</p>
+            <div class="flex items-center gap-3 flex-shrink-0">
+              <div style="text-align:right">
+                <div style="font-size:11px;color:var(--color-neutral-400)">权重</div>
+                <div style="font-size:13px;font-weight:600;color:var(--color-neutral-700);font-variant-numeric:tabular-nums">${ind.weight}</div>
+              </div>
+              <div style="text-align:right">
+                <div style="font-size:11px;color:var(--color-neutral-400)">达成阈</div>
+                <div style="font-size:13px;font-weight:600;color:var(--color-neutral-700);font-variant-numeric:tabular-nums">${Math.round(ind.threshold*100)}%</div>
+              </div>
+              <button onclick="editIndicator(${JSON.stringify(ind).replace(/"/g,'&quot;')})" class="btn btn-ghost btn-sm btn-icon" aria-label="编辑指标点">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              </button>
+            </div>
+          </div>
+        `).join('')}
+        ${!(gr.indicators||[]).length ? `<div style="padding:10px 20px;font-size:12px;color:var(--color-neutral-400)">暂无指标</div>` : ''}
+      </div>
+    `).join('');
+  }
+
+  function addObjective() {
+    if (!currentVersionId) { toast.warning('请先选择培养方案版本'); return; }
+    modal.form({ title:'添加培养目标', submitText:'添加',
+      fields:[
+        { name:'code',        label:'编号',     required:true, placeholder:'TO1', hint:'建议使用 TO1、TO2 格式' },
+        { name:'description', label:'目标描述', type:'textarea', required:true, placeholder:'描述该培养目标期望学生毕业后能够达到的目标'},
+        { name:'sort_order',  label:'排序',     type:'number', default:0 },
+      ],
+      onSubmit: async (data, close) => {
+        try {
+          await fetch(`/api/curriculum/versions/${currentVersionId}/objectives`, {
+            method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)
+          });
+          close(); toast.success('培养目标已添加'); loadCurriculum(currentVersionId);
+        } catch(e) { toast.error(e.message); }
+      }
+    });
+  }
+
+  function addGR() {
+    if (!currentVersionId) { toast.warning('请先选择培养方案版本'); return; }
+    modal.form({ title:'添加毕业要求', submitText:'添加',
+      fields:[
+        { name:'code',        label:'编号',     required:true, placeholder:'GR1' },
+        { name:'description', label:'要求描述', type:'textarea', required:true, placeholder:'该毕业要求的完整描述' },
+        { name:'sort_order',  label:'排序',     type:'number', default:0 },
+      ],
+      onSubmit: async (data, close) => {
+        try { await api.curriculum.createGR(currentVersionId, data); close(); toast.success('毕业要求已添加'); loadCurriculum(currentVersionId); }
+        catch(e) { toast.error(e.message); }
+      }
+    });
+  }
+
+  function addIndicator(grId, grCode) {
+    modal.form({ title:`添加指标${grCode}`, submitText:'添加',
+      fields:[
+        { name:'code',        label:'指标点编号', required:true, placeholder:`${grCode}.1` },
+        { name:'description', label:'描述',       type:'textarea', required:true },
+        { name:'weight',      label:'权重 (0~1)', type:'number', required:true, default:0.5, hint:'同一毕业要求下各指标点权重之和建议为 1.0' },
+        { name:'threshold',   label:'达成阈值',   type:'number', default:0.60, hint:'建议设为 0.60（即 60%）' },
+      ],
+      onSubmit: async (data, close) => {
+        try { await api.curriculum.createIndicator(grId, data); close(); toast.success('指标点已添加'); loadCurriculum(currentVersionId); }
+        catch(e) { toast.error(e.message); }
+      }
+    });
+  }
+
+  function editIndicator(ind) {
+    modal.form({ title:`编辑指标${ind.code}`, submitText:'保存',
+      fields:[
+        { name:'description', label:'描述', type:'textarea', required:true, default:ind.description },
+        { name:'weight',      label:'权重', type:'number', required:true, default:ind.weight },
+        { name:'threshold',   label:'达成阈值', type:'number', default:ind.threshold },
+      ],
+      onSubmit: async (data, close) => {
+        try { await api.curriculum.updateIndicator(ind.id, data); close(); toast.success('保存成功'); loadCurriculum(currentVersionId); }
+        catch(e) { toast.error(e.message); }
+      }
+    });
+  }
+
+  init();
+</script>
+</body>
+</html>

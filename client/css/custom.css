@@ -1,0 +1,98 @@
+/* ── Custom styles beyond Tailwind ─────────────────────────── */
+
+/* Sidebar */
+#sidebar {
+  background: linear-gradient(180deg, #1e2a4a 0%, #0f172a 100%);
+}
+
+/* Achievement bar */
+.achievement-bar {
+  height: 6px;
+  border-radius: 9999px;
+  background: #e2e8f0;
+  overflow: hidden;
+}
+.achievement-bar-fill {
+  height: 100%;
+  border-radius: 9999px;
+  transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.achievement-bar-fill.level-high   { background: linear-gradient(90deg, #10b981, #34d399); }
+.achievement-bar-fill.level-mid    { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+.achievement-bar-fill.level-low    { background: linear-gradient(90deg, #ef4444, #f87171); }
+
+/* Matrix cell */
+.matrix-cell {
+  transition: all 0.15s;
+  cursor: pointer;
+  user-select: none;
+}
+.matrix-cell:hover { opacity: 0.8; transform: scale(1.05); }
+.matrix-cell.H  { background: #3b82f6; color: white; }
+.matrix-cell.M  { background: #93c5fd; color: #1e40af; }
+.matrix-cell.L  { background: #dbeafe; color: #3b82f6; }
+.matrix-cell.none { background: #f1f5f9; }
+
+/* Card hover */
+.stat-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+}
+
+/* Data table */
+.data-table th {
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+}
+.data-table tr:hover td { background: #f8fafc; }
+
+/* Status badges */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.6rem;
+  border-radius: 9999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+.badge-success { background: #dcfce7; color: #15803d; }
+.badge-warning { background: #fef9c3; color: #a16207; }
+.badge-error   { background: #fee2e2; color: #b91c1c; }
+.badge-info    { background: #dbeafe; color: #1d4ed8; }
+.badge-gray    { background: #f1f5f9; color: #64748b; }
+
+/* Page transitions */
+.page-fade-in {
+  animation: pageFadeIn 0.25s ease;
+}
+@keyframes pageFadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Loading skeleton */
+.skeleton {
+  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  background-size: 200% 100%;
+  animation: skeleton 1.5s infinite;
+  border-radius: 0.5rem;
+}
+@keyframes skeleton {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar       { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+/* Nav hover bg */
+.hover\:bg-white\/8:hover { background-color: rgba(255,255,255,0.08); }
