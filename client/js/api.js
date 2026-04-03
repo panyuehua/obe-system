@@ -31,6 +31,11 @@ const api = {
   health: () => get('/health'),
   dashboard: () => get('/analysis/dashboard'),
 
+  // ── Colleges ──────────────────────────────────────────────
+  colleges: {
+    list: () => get('/colleges'),
+  },
+
   // ── Majors ────────────────────────────────────────────────
   majors: {
     list:   ()       => get('/majors'),
@@ -42,16 +47,27 @@ const api = {
 
   // ── Curriculum ────────────────────────────────────────────
   curriculum: {
-    versions:     (majorId) => get(`/curriculum/versions?major_id=${majorId}`),
-    getVersion:   (id)      => get(`/curriculum/versions/${id}`),
-    createVersion:(data)    => post('/curriculum/versions', data),
-    getGR:        (vId)     => get(`/curriculum/versions/${vId}/gr`),
-    createGR:     (vId, d)  => post(`/curriculum/versions/${vId}/gr`, d),
+    versions:      (majorId) => get(`/curriculum/versions${majorId ? '?major_id=' + majorId : ''}`),
+    allVersions:   ()        => get('/curriculum/versions'),
+    getVersion:    (id)      => get(`/curriculum/versions/${id}`),
+    createVersion: (data)    => post('/curriculum/versions', data),
+    /** 从指定版本整包克隆（培养目标、毕业要求、课程、支撑关系等） */
+    cloneVersion:  (sourceId, data) => post(`/curriculum/versions/${sourceId}/clone`, data),
+    updateVersion: (id, d)   => put(`/curriculum/versions/${id}`, d),
+    deleteVersion: (id)      => del(`/curriculum/versions/${id}`),
+    getGR:         (vId)     => get(`/curriculum/versions/${vId}/gr`),
+    createGR:      (vId, d)  => post(`/curriculum/versions/${vId}/gr`, d),
     createIndicator: (grId, d) => post(`/curriculum/gr/${grId}/indicators`, d),
     updateIndicator: (id, d)   => put(`/curriculum/indicators/${id}`, d),
-    supportMatrix:  (vId)   => get(`/curriculum/versions/${vId}/support-matrix`),
-    saveSupport:    (data)  => post('/curriculum/support', data),
-    removeSupport:  (data)  => del('/curriculum/support', data),
+    supportMatrix:     (vId)   => get(`/curriculum/versions/${vId}/support-matrix`),
+    saveSupport:       (data)  => post('/curriculum/support', data),
+    removeSupport:     (data)  => del('/curriculum/support', data),
+    objGrMatrix:       (vId)   => get(`/curriculum/versions/${vId}/obj-gr-matrix`),
+    saveObjGrSupport:  (data)  => post('/curriculum/obj-gr-support', data),
+    removeObjGrSupport:(data)  => del('/curriculum/obj-gr-support', data),
+    deleteGR:          (id)    => del(`/curriculum/gr/${id}`),
+    deleteIndicator:   (id)    => del(`/curriculum/indicators/${id}`),
+    deleteObjective:   (id)    => del(`/curriculum/objectives/${id}`),
   },
 
   // ── Courses ───────────────────────────────────────────────

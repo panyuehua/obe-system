@@ -49,12 +49,13 @@
   nav.render('majors');
 
   let allMajors = [];
+  let allColleges = [];
   const certMap = { vocational:'高职专科', engineering:'工程认证', other:'其他' };
   const certColor = { vocational:'badge-primary', engineering:'badge-info', other:'badge-neutral' };
 
   async function loadMajors() {
     try {
-      allMajors = await api.majors.list();
+      [allMajors, allColleges] = await Promise.all([api.majors.list(), api.colleges.list()]);
       renderGrid(allMajors);
     } catch (e) { toast.error('加载失败：' + e.message); }
   }
@@ -122,7 +123,9 @@
   const formFields = (d = {}) => [
     { name:'name',         label:'专业名称',   required:true, placeholder:'例如：软件技术', default:d.name },
     { name:'code',         label:'专业代码',   placeholder:'如 RJ',              default:d.code },
-    { name:'college_id',   label:'学院 ID', type:'number', required:true,       default:d.college_id||1 },
+    { name:'college_id',   label:'所属学院',   type:'select', required:true,
+      options: allColleges.map(c => ({ value: c.id, label: c.name })),
+      default: d.college_id || (allColleges[0] && allColleges[0].id) || '' },
     { name:'degree_years', label:'学制（年）', type:'number',                       default:d.degree_years||3 },
     { name:'cert_type',    label:'认证类型',   type:'select',
       options:[{value:'vocational',label:'高职专科'},{value:'engineering',label:'工程认证'},{value:'other',label:'其他'}],
@@ -132,8 +135,10 @@
   function openCreateModal() {
     modal.form({ title:'添加专业', fields:formFields(), submitText:'创建',
       onSubmit: async (data, close) => {
-        try { await api.majors.create(data); close(); toast.success('专业已创建'); loadMajors(); }
-        catch(e) { toast.error(e.message); }
+        try {
+          await api.majors.create({ ...data, college_id: Number(data.college_id), degree_years: Number(data.degree_years) });
+          close(); toast.success('专业已创建'); loadMajors();
+        } catch(e) { toast.error(e.message); }
       }
     });
   }
@@ -141,8 +146,10 @@
   function openEditModal(m) {
     modal.form({ title:'编辑专业', fields:formFields(m), submitText:'保存',
       onSubmit: async (data, close) => {
-        try { await api.majors.update(m.id, data); close(); toast.success('已保存'); loadMajors(); }
-        catch(e) { toast.error(e.message); }
+        try {
+          await api.majors.update(m.id, { ...data, college_id: Number(data.college_id), degree_years: Number(data.degree_years) });
+          close(); toast.success('已保存'); loadMajors();
+        } catch(e) { toast.error(e.message); }
       }
     });
   }

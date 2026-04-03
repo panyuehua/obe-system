@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 
 const { success } = require('../utils/response');
+const db = require('../config/database');
 
 // ── Health check ──────────────────────────────────────────────────────────────
 router.get('/health', (req, res) => {
@@ -10,6 +11,12 @@ router.get('/health', (req, res) => {
     version: '1.0.0',
     timestamp: new Date().toISOString(),
   });
+});
+
+// ── Colleges (read-only list for dropdowns) ───────────────────────────────────
+router.get('/colleges', (req, res) => {
+  const colleges = db.prepare('SELECT id, name, code FROM colleges ORDER BY name').all();
+  success(res, colleges);
 });
 
 // ── Feature routes ────────────────────────────────────────────────────────────

@@ -430,13 +430,13 @@
 
   const SOURCE_LABEL = { academic: '教务系统', lms: '教学平台', industry: '行业数据' };
   const TYPE_LABEL   = {
-    schools: '学校/学院/专业', students: '学生信息', courses: '课程数据',
+    schools: '学校·学院·专业', students: '学生信息', courses: '课程数据',
     curriculum: '培养方案', grades: '学生成绩',
     tasks: '课程任务', scores: '任务成绩', behavior: '学习行为', resources: '资源使用',
     jobs: '招聘岗位', policy: '政策文件',
   };
   const ACADEMIC_TYPES = [
-    { key: 'schools',    label: '学校/学院/专业', icon: '#7c3aed', bg: '#f5f3ff' },
+    { key: 'schools',    label: '学校 · 学院 · 专业', icon: '#7c3aed', bg: '#f5f3ff' },
     { key: 'students',   label: '学生信息',       icon: '#2563eb', bg: '#eff6ff' },
     { key: 'courses',    label: '课程开设数据',   icon: '#0891b2', bg: '#ecfeff' },
     { key: 'curriculum', label: '培养方案数据',   icon: '#059669', bg: '#ecfdf5' },
@@ -482,8 +482,66 @@
   // ── Tab1：教务系统卡片 ────────────────────────────────────────
   function renderAcademicCards(data) {
     const counts = data.counts || {};
+    // 分项优先来自 counts.*（与接口主 payload 同层）
+    const struct = counts.organization || data.structureCounts || {};
+    const courseOff = counts.courseOfferings || data.courseOfferings || {};
+    const gradeInfo = counts.gradeBreakdown || data.gradeBreakdown || {};
     const src    = data.sources?.academic || {};
-    document.getElementById('academic-cards').innerHTML = ACADEMIC_TYPES.map(t => `
+
+    function orgBreakdownHtml() {
+      const s = struct.schools ?? 0;
+      const c = struct.colleges ?? 0;
+      const m = struct.majors ?? 0;
+      return `
+        <div class="grid grid-cols-3 gap-2 mt-2 text-center">
+          <div class="rounded-lg px-1 py-2" style="background:var(--color-neutral-50);border:1px solid var(--color-border-subtle)">
+            <p style="font-size:18px;font-weight:700;color:var(--color-neutral-900);line-height:1.2">${s}</p>
+            <p style="font-size:10px;color:var(--color-neutral-500);margin-top:2px">学校</p>
+          </div>
+          <div class="rounded-lg px-1 py-2" style="background:var(--color-neutral-50);border:1px solid var(--color-border-subtle)">
+            <p style="font-size:18px;font-weight:700;color:var(--color-neutral-900);line-height:1.2">${c}</p>
+            <p style="font-size:10px;color:var(--color-neutral-500);margin-top:2px">学院</p>
+          </div>
+          <div class="rounded-lg px-1 py-2" style="background:var(--color-neutral-50);border:1px solid var(--color-border-subtle)">
+            <p style="font-size:18px;font-weight:700;color:var(--color-neutral-900);line-height:1.2">${m}</p>
+            <p style="font-size:10px;color:var(--color-neutral-500);margin-top:2px">专业</p>
+          </div>
+        </div>
+        <p style="font-size:11px;color:var(--color-neutral-400);margin-top:8px">合计 ${counts.schools ?? 0} 条组织记录（分表存储）</p>`;
+    }
+
+    function courseBreakdownHtml() {
+      const p = courseOff.planCourses ?? 0;
+      const tc = courseOff.teachingClasses ?? 0;
+      return `
+        <div class="grid grid-cols-2 gap-2 mt-2 text-center">
+          <div class="rounded-lg px-1 py-2" style="background:var(--color-neutral-50);border:1px solid var(--color-border-subtle)">
+            <p style="font-size:18px;font-weight:700;color:var(--color-neutral-900);line-height:1.2">${p}</p>
+            <p style="font-size:10px;color:var(--color-neutral-500);margin-top:2px">培养方案课程</p>
+          </div>
+          <div class="rounded-lg px-1 py-2" style="background:var(--color-neutral-50);border:1px solid var(--color-border-subtle)">
+            <p style="font-size:18px;font-weight:700;color:var(--color-neutral-900);line-height:1.2">${tc}</p>
+            <p style="font-size:10px;color:var(--color-neutral-500);margin-top:2px">教学班开课</p>
+          </div>
+        </div>
+        <p style="font-size:11px;color:var(--color-neutral-400);margin-top:8px">合计 ${counts.courses ?? 0} 条（方案课程 + 开课班；与教务「开设」对应教学班）</p>`;
+    }
+
+    function gradeBreakdownHtml() {
+      const n = gradeInfo.scoreRecords ?? counts.grades ?? 0;
+      return `
+        <p style="font-size:22px;font-weight:700;color:var(--color-neutral-900);line-height:1.2">${n} <span style="font-size:12px;font-weight:400;color:var(--color-neutral-400)">条得分记录</span></p>
+        <p style="font-size:11px;color:var(--color-neutral-400);margin-top:6px;line-height:1.5">对应库表 <code style="font-size:10px">scores</code>：学生 × 考核项 的得分，非「一门课一条总评」。</p>`;
+    }
+
+    document.getElementById('academic-cards').innerHTML = ACADEMIC_TYPES.map((t) => {
+      let countBlock;
+      if (t.key === 'schools') countBlock = orgBreakdownHtml();
+      else if (t.key === 'courses') countBlock = courseBreakdownHtml();
+      else if (t.key === 'grades') countBlock = gradeBreakdownHtml();
+      else countBlock = `<p style="font-size:22px;font-weight:700;color:var(--color-neutral-900);line-height:1.2">${counts[t.key] ?? 0} <span style="font-size:12px;font-weight:400;color:var(--color-neutral-400)">条记录</span></p>`;
+
+      return `
       <div class="sync-card">
         <div class="flex items-start justify-between mb-3">
           <div style="width:36px;height:36px;border-radius:10px;background:${t.bg};display:flex;align-items:center;justify-content:center;color:${t.icon}">
@@ -495,19 +553,20 @@
           </div>
         </div>
         <p style="font-size:13px;font-weight:700;color:var(--color-neutral-800);margin-bottom:2px">${t.label}</p>
-        <p style="font-size:22px;font-weight:700;color:var(--color-neutral-900);line-height:1.2">${counts[t.key] ?? 0} <span style="font-size:12px;font-weight:400;color:var(--color-neutral-400)">条记录</span></p>
+        ${countBlock}
         <div class="flex gap-2 mt-3">
           <button onclick="syncAcademic('${t.key}', this)" class="btn btn-primary btn-sm flex-1">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
             立即同步
           </button>
-          <button onclick="openCsvImport('${t.key}', '${t.label}')" class="btn btn-secondary btn-sm flex-1">
+          <button onclick="openCsvImport('${t.key}', '${t.label.replace(/'/g, "\\'")}')" class="btn btn-secondary btn-sm flex-1">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
             CSV导入
           </button>
         </div>
       </div>
-    `).join('');
+    `;
+    }).join('');
   }
 
   async function syncAcademic(dataType, btn) {
