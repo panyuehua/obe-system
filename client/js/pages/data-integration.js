@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 数据接入 — data-integration.html
  */
 nav.render('data-integration');
@@ -141,6 +141,10 @@ nav.render('data-integration');
           <button onclick="openCsvImport('${t.key}', '${t.label.replace(/'/g, "\\'")}')" class="btn btn-secondary btn-sm flex-1">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
             CSV导入
+          </button>
+          <button onclick="openDataManager('${t.key}', '${t.label.replace(/'/g, "\\'")}')" class="btn btn-ghost btn-sm" title="数据管理" style="flex-shrink:0;border:1px solid var(--color-border-subtle)">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+            数据管理
           </button>
         </div>
       </div>
@@ -443,6 +447,295 @@ nav.render('data-integration');
       if (j.code !== 0) throw new Error(j.message);
       return j.data;
     });
+
+  // ══════════════════════════════════════════════════════════════
+  //  数据管理抽屉
+  // ══════════════════════════════════════════════════════════════
+
+  // 每种数据类型的列配置与表单字段定义
+  const DM_CONFIG = {
+    schools: {
+      subtitle: '管理学校、学院、专业的组织架构数据',
+      columns: [
+        { key: 'entity_type', label: '类型',   render: v => ({ school:'学校', college:'学院', major:'专业' }[v] || v) },
+        { key: 'name',        label: '名称'   },
+        { key: 'code',        label: '代码'   },
+        { key: 'parent_name', label: '上级单位' },
+      ],
+      fields: [
+        { name: 'entity_type', label: '类型', type: 'select', required: true,
+          options: [{ value:'school', label:'学校' }, { value:'college', label:'学院' }, { value:'major', label:'专业' }] },
+        { name: 'name', label: '名称', required: true, placeholder: '例如：计算机学院' },
+        { name: 'code', label: '代码', placeholder: '例如：CS' },
+        { name: 'parent_name', label: '上级单位名称', placeholder: '如为顶级单位可留空' },
+      ],
+    },
+    students: {
+      subtitle: '管理学生基本信息与分班数据',
+      columns: [
+        { key: 'student_no',  label: '学号'   },
+        { key: 'name',        label: '姓名'   },
+        { key: 'gender',      label: '性别', render: v => ({ male:'男', female:'女' }[v] || v || '—') },
+        { key: 'grade_year',  label: '年级'   },
+        { key: 'class_name',  label: '班级'   },
+        { key: 'major_name',  label: '专业'   },
+      ],
+      fields: [
+        { name: 'student_no', label: '学号', required: true, placeholder: '例如：20230001' },
+        { name: 'name',       label: '姓名', required: true },
+        { name: 'gender',     label: '性别', type: 'select',
+          options: [{ value:'', label:'不填' }, { value:'male', label:'男' }, { value:'female', label:'女' }] },
+        { name: 'grade_year', label: '入学年份', type: 'number', placeholder: '例如：2023' },
+        { name: 'class_name', label: '班级', placeholder: '例如：软件2301' },
+        { name: 'major_name', label: '专业名称', placeholder: '与专业表对应' },
+      ],
+    },
+    courses: {
+      subtitle: '管理课程开设与培养方案课程数据',
+      columns: [
+        { key: 'course_no',   label: '课程号' },
+        { key: 'name',        label: '课程名' },
+        { key: 'credits',     label: '学分'   },
+        { key: 'course_type', label: '类型',
+          render: v => ({ required:'必修', elective:'选修', practice:'实践' }[v] || v || '—') },
+        { key: 'version_name', label: '培养方案' },
+      ],
+      fields: [
+        { name: 'course_no',   label: '课程号', required: true, placeholder: '例如：CS101' },
+        { name: 'name',        label: '课程名', required: true },
+        { name: 'credits',     label: '学分',   type: 'number', placeholder: '例如：3' },
+        { name: 'course_type', label: '课程类型', type: 'select',
+          options: [{ value:'required', label:'必修' }, { value:'elective', label:'选修' }, { value:'practice', label:'实践' }] },
+        { name: 'version_name', label: '培养方案版本名', placeholder: '例如：2023版' },
+      ],
+    },
+    curriculum: {
+      subtitle: '管理培养方案版本基础数据',
+      columns: [
+        { key: 'version_name', label: '版本名称' },
+        { key: 'major_name',   label: '专业'     },
+        { key: 'year',         label: '年份'     },
+        { key: 'status',       label: '状态',
+          render: v => v === 'active'
+            ? '<span class="badge badge-success">启用</span>'
+            : '<span class="badge badge-neutral">草稿</span>' },
+      ],
+      fields: [
+        { name: 'version_name', label: '版本名称', required: true, placeholder: '例如：2023版培养方案' },
+        { name: 'major_name',   label: '专业名称', placeholder: '例如：软件工程' },
+        { name: 'year',         label: '年份', type: 'number', placeholder: '例如：2023' },
+        { name: 'status',       label: '状态', type: 'select',
+          options: [{ value:'draft', label:'草稿' }, { value:'active', label:'启用' }] },
+      ],
+    },
+    grades: {
+      subtitle: '管理学生考核得分记录',
+      columns: [
+        { key: 'student_no',   label: '学号'   },
+        { key: 'student_name', label: '姓名'   },
+        { key: 'course_no',    label: '课程号' },
+        { key: 'semester',     label: '学期'   },
+        { key: 'score',        label: '分数',
+          render: v => `<span style="font-weight:600;color:${v>=60?'var(--color-success)':'var(--color-error)'}">${v ?? '—'}</span>` },
+      ],
+      fields: [
+        { name: 'student_no',   label: '学号',   required: true, placeholder: '例如：20230001' },
+        { name: 'student_name', label: '姓名' },
+        { name: 'course_no',    label: '课程号', required: true, placeholder: '例如：CS101' },
+        { name: 'semester',     label: '学期',   required: true, placeholder: '例如：2024-2025-1' },
+        { name: 'score',        label: '分数',   type: 'number', required: true, placeholder: '0 ~ 100' },
+      ],
+    },
+  };
+
+  let dmType        = null;
+  let dmPage        = 1;
+  let dmTotal       = 0;
+  let dmEditingId   = null;
+  let dmSearchTimer = null;
+  const DM_PAGE_SIZE = 15;
+
+  function openDataManager(type, label) {
+    dmType      = type;
+    dmPage      = 1;
+    dmEditingId = null;
+    const cfg   = DM_CONFIG[type] || {};
+
+    document.getElementById('dm-title').textContent    = `${label} — 数据管理`;
+    document.getElementById('dm-subtitle').textContent = cfg.subtitle || '';
+    document.getElementById('dm-search').value         = '';
+
+    document.getElementById('dm-overlay').classList.add('open');
+    document.getElementById('dm-drawer').classList.add('open');
+    document.body.style.overflow = 'hidden';
+
+    loadDmData();
+  }
+
+  function closeDataManager() {
+    document.getElementById('dm-overlay').classList.remove('open');
+    document.getElementById('dm-drawer').classList.remove('open');
+    document.body.style.overflow = '';
+  }
+
+  // ESC 关闭抽屉
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeDataManager();
+  });
+
+  async function loadDmData() {
+    const search = document.getElementById('dm-search')?.value || '';
+    const body   = document.getElementById('dm-body');
+    body.innerHTML = '<div class="dm-empty"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="animation:spin 1s linear infinite"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg><p>加载中…</p></div>';
+    try {
+      const data = await api.dataIntegration.listRecords(dmType, {
+        search, page: dmPage, page_size: DM_PAGE_SIZE,
+      });
+      dmTotal = data.total ?? 0;
+      renderDmTable(data.list ?? data.records ?? []);
+      renderDmPagination();
+    } catch (e) {
+      body.innerHTML = `<div class="dm-empty"><p style="color:var(--color-error)">加载失败：${e.message}</p></div>`;
+    }
+  }
+
+  function renderDmTable(list) {
+    const cfg  = DM_CONFIG[dmType];
+    const body = document.getElementById('dm-body');
+
+    if (!list.length) {
+      body.innerHTML = `
+        <div class="dm-empty">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+          <p>暂无数据，可点击「添加记录」手动录入，或通过同步/CSV导入</p>
+        </div>`;
+      document.getElementById('dm-footer').style.display = 'none';
+      return;
+    }
+
+    const ths = cfg.columns.map(c => `<th>${c.label}</th>`).join('') + '<th style="text-align:right">操作</th>';
+    const trs = list.map(row => {
+      const tds = cfg.columns.map(c => {
+        const val = row[c.key];
+        return `<td>${c.render ? c.render(val) : (val ?? '—')}</td>`;
+      }).join('');
+      const id = row.id ?? row._id ?? row.student_no ?? row.course_no;
+      return `<tr>
+        ${tds}
+        <td style="text-align:right;white-space:nowrap">
+          <button onclick='openDmForm(${JSON.stringify(row).replace(/'/g,"&#39;")})' class="btn btn-ghost btn-sm" style="padding:4px 8px" title="编辑">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </button>
+          <button onclick="deleteDmRecord('${id}')" class="btn btn-ghost btn-sm" style="padding:4px 8px;color:var(--color-error)" title="删除">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
+          </button>
+        </td>
+      </tr>`;
+    }).join('');
+
+    body.innerHTML = `<table class="dm-table"><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table>`;
+  }
+
+  function renderDmPagination() {
+    const footer     = document.getElementById('dm-footer');
+    const totalPages = Math.ceil(dmTotal / DM_PAGE_SIZE);
+    if (dmTotal <= DM_PAGE_SIZE) { footer.style.display = 'none'; return; }
+    footer.style.display = 'flex';
+    document.getElementById('dm-count').textContent           = `共 ${dmTotal} 条记录`;
+    document.getElementById('dm-page-indicator').textContent  = `第 ${dmPage} / ${totalPages} 页`;
+    document.getElementById('dm-prev').disabled               = dmPage <= 1;
+    document.getElementById('dm-next').disabled               = dmPage >= totalPages;
+  }
+
+  function dmChangePage(delta) {
+    const totalPages = Math.ceil(dmTotal / DM_PAGE_SIZE);
+    const next = dmPage + delta;
+    if (next < 1 || next > totalPages) return;
+    dmPage = next;
+    loadDmData();
+  }
+
+  function dmSearchDebounce() {
+    clearTimeout(dmSearchTimer);
+    dmSearchTimer = setTimeout(() => { dmPage = 1; loadDmData(); }, 320);
+  }
+
+  // ── 添加 / 编辑表单 ─────────────────────────────────────────
+  function openDmForm(record = null) {
+    const cfg    = DM_CONFIG[dmType];
+    const isEdit = record && (record.id || record._id || record.student_no);
+    dmEditingId  = isEdit ? (record.id ?? record._id ?? record.student_no) : null;
+
+    const fieldsHtml = cfg.fields.map(f => {
+      const val = record ? (record[f.name] ?? '') : '';
+      if (f.type === 'select') {
+        const opts = f.options.map(o =>
+          `<option value="${o.value}" ${String(val) === String(o.value) ? 'selected' : ''}>${o.label}</option>`
+        ).join('');
+        return `<div class="form-group">
+          <label class="form-label">${f.label}${f.required ? ' <span style="color:var(--color-error)">*</span>' : ''}</label>
+          <select id="dmf-${f.name}" class="form-select">${opts}</select>
+        </div>`;
+      }
+      return `<div class="form-group">
+        <label class="form-label">${f.label}${f.required ? ' <span style="color:var(--color-error)">*</span>' : ''}</label>
+        <input id="dmf-${f.name}" type="${f.type || 'text'}" class="form-input"
+          value="${String(val).replace(/"/g,'&quot;')}"
+          placeholder="${f.placeholder || ''}" ${f.required ? 'required' : ''} />
+      </div>`;
+    }).join('');
+
+    modal.open({
+      title: isEdit ? `编辑记录` : `添加记录`,
+      size:  'modal-lg',
+      body:  `<div class="grid grid-cols-1 gap-4" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr))">${fieldsHtml}</div>`,
+      confirmText: isEdit ? '保存修改' : '确认添加',
+      onConfirm: () => submitDmForm(cfg, isEdit),
+    });
+  }
+
+  async function submitDmForm(cfg, isEdit) {
+    const data = {};
+    let valid  = true;
+
+    for (const f of cfg.fields) {
+      const el  = document.getElementById(`dmf-${f.name}`);
+      const val = el ? el.value.trim() : '';
+      if (f.required && !val) {
+        toast.warning(`「${f.label}」为必填项`);
+        valid = false; break;
+      }
+      data[f.name] = f.type === 'number' ? (val === '' ? null : Number(val)) : val;
+    }
+    if (!valid) return;
+
+    try {
+      if (isEdit) {
+        await api.dataIntegration.updateRecord(dmType, dmEditingId, data);
+        toast.success('记录已更新');
+      } else {
+        await api.dataIntegration.createRecord(dmType, data);
+        toast.success('记录已添加');
+      }
+      loadDmData();
+      loadStatus();
+    } catch (e) {
+      toast.error((isEdit ? '更新' : '添加') + '失败：' + e.message);
+    }
+  }
+
+  async function deleteDmRecord(id) {
+    const ok = await modal.confirm('确定要删除这条记录吗？此操作不可撤销。', { title: '删除确认', danger: true });
+    if (!ok) return;
+    try {
+      await api.dataIntegration.deleteRecord(dmType, id);
+      toast.success('已删除');
+      loadDmData();
+      loadStatus();
+    } catch (e) {
+      toast.error('删除失败：' + e.message);
+    }
+  }
 
   // ── 初始化 ───────────────────────────────────────────────────
   loadStatus();

@@ -119,6 +119,11 @@ const api = {
     industryStats: ()           => get('/data-integration/industry/stats'),
     qualityLogs:   (params)     => get(`/data-integration/quality/logs?${new URLSearchParams(params)}`),
     qualityStats:  ()           => get('/data-integration/quality/stats'),
+    // ── 数据管理 CRUD ──────────────────────────────────────
+    listRecords:   (type, params) => get(`/data-integration/records/${type}?${new URLSearchParams(params)}`),
+    createRecord:  (type, data)   => post(`/data-integration/records/${type}`, data),
+    updateRecord:  (type, id, data) => put(`/data-integration/records/${type}/${id}`, data),
+    deleteRecord:  (type, id)     => del(`/data-integration/records/${type}/${id}`),
   },
 };
 
