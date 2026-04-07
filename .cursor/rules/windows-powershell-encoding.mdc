@@ -1,0 +1,42 @@
+---
+description: Windows PowerShell 文件操作必须显式指定 UTF-8 编码，防止中文乱码
+alwaysApply: true
+---
+
+# Windows PowerShell 文件编码规范
+
+在 Windows 环境下，PowerShell 的 `Get-Content` / `Set-Content` 默认使用系统 ANSI 编码（GBK），会破坏 UTF-8 文件中的中文字符。
+
+## 规则
+
+**禁止**使用不指定编码的方式读写文件内容：
+
+```powershell
+# ❌ 错误 - 会损坏中文
+$content = Get-Content $file -Raw
+Set-Content $file $content
+(Get-Content $file -Raw) -replace 'foo','bar' | Set-Content $file
+```
+
+**必须**使用 `[System.IO.File]` 并显式指定 UTF-8 编码：
+
+```powershell
+# ✅ 正确 - 安全处理中文
+$content = [System.IO.File]::ReadAllText($path, [System.Text.Encoding]::UTF8)
+$content = $content -replace 'old', 'new'
+[System.IO.File]::WriteAllText($path, $content, [System.Text.Encoding]::UTF8)
+```
+
+## 适用场景
+
+任何通过 PowerShell 对含中文内容的文件进行读取、替换、写入操作时，均须遵守此规范。
+
+## 文件损坏补救
+
+如果操作已导致中文乱码，立即执行：
+
+```powershell
+git restore <损坏的文件路径>
+```
+
+再用正确编码方式重新操作。
