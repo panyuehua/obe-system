@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
@@ -19,7 +19,20 @@
     .cell-btn.H    { background: var(--color-primary-600); color: #fff; }
     .cell-btn.M    { background: var(--color-primary-200); color: var(--color-primary-700); }
     .cell-btn.L    { background: var(--color-primary-50);  color: var(--color-primary-500); }
-    .cell-btn.none { background: var(--color-neutral-100); color: var(--color-neutral-300); }
+    .cell-btn.none  { background: var(--color-neutral-100); color: var(--color-neutral-300); }
+    .cell-btn.check { background: var(--color-primary-100); color: var(--color-primary-600); font-size:15px; }
+
+    /* 模式切换分段控件 */
+    .mode-seg { display:flex; background:var(--color-neutral-100); border-radius:8px; padding:3px; gap:2px; }
+    .mode-seg button {
+      padding: 5px 14px; border-radius: 6px; border: none; cursor: pointer;
+      font-size: 12px; font-weight: 600; transition: all 0.2s;
+      color: var(--color-neutral-500); background: transparent;
+    }
+    .mode-seg button.active {
+      background: #fff; color: var(--color-primary-600);
+      box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+    }
   </style>
 </head>
 <body>
@@ -32,15 +45,22 @@
         <h1 class="page-title">支撑矩阵</h1>
         <p class="page-subtitle">配置指标点与课程之间的支撑关系权重</p>
       </div>
-      <div class="flex items-center gap-2">
+      <div class="flex items-center gap-3">
         <select id="version-select" onchange="loadMatrix()" class="form-select" style="min-height:40px;padding-top:8px;padding-bottom:8px;min-width:220px">
           <option value="">选择培养方案版本</option>
         </select>
-        <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg" style="background:var(--color-neutral-100);font-size:12px">
+
+        <!-- 模式切换 -->
+        <div class="mode-seg" id="mode-seg">
+          <button id="mode-btn-check" class="active" onclick="switchMode('check')">✓ 简单支撑</button>
+          <button id="mode-btn-hml"           onclick="switchMode('hml')">HML 强度</button>
+        </div>
+
+        <!-- HML 图例（仅 hml 模式显示） -->
+        <div id="hml-legend" class="hidden flex items-center gap-1.5 px-3 py-1.5 rounded-lg" style="background:var(--color-neutral-100);font-size:12px">
           <span class="cell-btn H" style="width:20px;height:20px;font-size:9px;border-radius:4px">H</span><span style="color:var(--color-neutral-600)">高</span>
           <span class="cell-btn M" style="width:20px;height:20px;font-size:9px;border-radius:4px;margin-left:8px">M</span><span style="color:var(--color-neutral-600)">中</span>
           <span class="cell-btn L" style="width:20px;height:20px;font-size:9px;border-radius:4px;margin-left:8px">L</span><span style="color:var(--color-neutral-600)">低</span>
-          <span class="cell-btn none" style="width:20px;height:20px;font-size:9px;border-radius:4px;margin-left:8px">无</span><span style="color:var(--color-neutral-600)">无</span>
         </div>
       </div>
     </header>
@@ -50,7 +70,7 @@
       <!-- Info bar -->
       <div id="info-bar" class="hidden flex items-center gap-4 px-4 py-3 rounded-xl" style="background:var(--color-primary-50);border:1px solid var(--color-primary-100)">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary-500)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-        <p style="font-size:13px;color:var(--color-primary-700)">点击单元格循环切换支撑强度：<strong>无 → H（强）→ M（中）→ L（弱）→ 无</strong>，权重值可在弹窗中精确设置。更改实时保存。</p>
+        <p id="info-bar-text" style="font-size:13px;color:var(--color-primary-700)"></p>
       </div>
 
       <!-- Matrix card -->

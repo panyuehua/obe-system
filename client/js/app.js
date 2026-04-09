@@ -180,7 +180,6 @@ const nav = (() => {
     { icon: 'graduation-cap',   label: '专业管理',   href: '/pages/majors.html',     key: 'majors' },
     { icon: 'clipboard-list',   label: '培养方案',   href: '/pages/curriculum.html', key: 'curriculum' },
     { icon: 'book-open',        label: '课程管理',   href: '/pages/courses.html',    key: 'courses' },
-    { icon: 'grid-3x3',         label: '支撑矩阵',   href: '/pages/matrix.html',     key: 'matrix' },
     { icon: 'bar-chart-2',      label: '达成度分析', href: '/pages/analysis.html',   key: 'analysis' },
     { icon: 'stethoscope',      label: '诊断报告',   href: '/pages/diagnosis.html',  key: 'diagnosis' },
     { icon: 'refresh-cw',       label: '持续改进',   href: '/pages/improvement.html',key: 'improvement' },

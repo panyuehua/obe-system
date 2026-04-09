@@ -65,13 +65,17 @@ CREATE TABLE IF NOT EXISTS majors (
 );
 
 CREATE TABLE IF NOT EXISTS curriculum_versions (
-  id          INTEGER PRIMARY KEY AUTOINCREMENT,
-  major_id    INTEGER NOT NULL REFERENCES majors(id) ON DELETE CASCADE,
-  version     TEXT NOT NULL,
-  grade_year  INTEGER NOT NULL,
-  status      TEXT DEFAULT 'draft',
-  created_at  TEXT DEFAULT (datetime('now','localtime')),
-  updated_at  TEXT DEFAULT (datetime('now','localtime')),
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  major_id       INTEGER NOT NULL REFERENCES majors(id) ON DELETE CASCADE,
+  version        TEXT NOT NULL,
+  grade_year     INTEGER NOT NULL,
+  status         TEXT DEFAULT 'draft',
+  matrix_mode    TEXT DEFAULT 'check',
+  hml_weight_h   REAL DEFAULT 1.0,
+  hml_weight_m   REAL DEFAULT 0.6,
+  hml_weight_l   REAL DEFAULT 0.3,
+  created_at     TEXT DEFAULT (datetime('now','localtime')),
+  updated_at     TEXT DEFAULT (datetime('now','localtime')),
   UNIQUE(major_id, grade_year, version)
 );
 
@@ -316,9 +320,28 @@ function migrateCurriculumVersionsUniqueConstraint() {
   console.log('✅ curriculum_versions 表结构已更新');
 }
 
+/** 为 curriculum_versions 追加 matrix_mode 列（兼容已有库） */
+function migrateAddMatrixMode() {
+  const cols = db.prepare(`PRAGMA table_info(curriculum_versions)`).all();
+  if (!cols.some(c => c.name === 'matrix_mode')) {
+    console.log('📦 迁移 curriculum_versions：添加 matrix_mode 列…');
+    db.exec(`ALTER TABLE curriculum_versions ADD COLUMN matrix_mode TEXT DEFAULT 'check'`);
+    console.log('✅ matrix_mode 列已添加');
+  }
+  // HML 权重配置列
+  if (!cols.some(c => c.name === 'hml_weight_h')) {
+    console.log('📦 迁移 curriculum_versions：添加 HML 权重列…');
+    db.exec(`ALTER TABLE curriculum_versions ADD COLUMN hml_weight_h REAL DEFAULT 1.0`);
+    db.exec(`ALTER TABLE curriculum_versions ADD COLUMN hml_weight_m REAL DEFAULT 0.6`);
+    db.exec(`ALTER TABLE curriculum_versions ADD COLUMN hml_weight_l REAL DEFAULT 0.3`);
+    console.log('✅ HML 权重列已添加');
+  }
+}
+
 try {
   db.exec(schema);
   migrateCurriculumVersionsUniqueConstraint();
+  migrateAddMatrixMode();
   console.log('✅ 数据库迁移完成');
 } catch (err) {
   console.error('❌ 数据库迁移失败:', err.message);

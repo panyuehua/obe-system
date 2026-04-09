@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 培养方案 — curriculum.html
  */
 nav.render('curriculum');
@@ -10,8 +10,10 @@ nav.render('curriculum');
   let currentVersionData = null;
   let activeTab          = 'objectives';
   let objGrRelations     = null; // Set of "objId_grId"
-  let sicRelations       = null; // Set of "indId_courseId"
-  let matrixLoaded       = { 'obj-gr': false, 'matrix': false };
+  let sicRelations       = null; // Map of "indId_courseId" -> weight
+  let sicMode            = 'check'; // 'check' | 'hml'
+  let matrixLoaded       = { 'obj-gr': false, 'matrix': false, 'courses': false };
+  let cvCourses          = [];  // 当前版本课程缓存
 
   /* ═══════════════════════════════════════════════════════
      初始化 & 列表
@@ -125,7 +127,8 @@ nav.render('curriculum');
     document.getElementById('view-detail').classList.add('hidden');
     currentVersionId = null; currentVersionData = null;
     objGrRelations = null; sicRelations = null;
-    matrixLoaded = { 'obj-gr': false, 'matrix': false };
+    matrixLoaded = { 'obj-gr': false, 'matrix': false, 'courses': false };
+    cvCourses = [];
     api.curriculum.allVersions().then(d => { allVersions = d; filterVersions(); }).catch(() => {});
   }
 
@@ -197,8 +200,8 @@ nav.render('curriculum');
   async function openDetail(vId) {
     try {
       currentVersionId = vId;
-      matrixLoaded = { 'obj-gr': false, 'matrix': false };
-      objGrRelations = null; sicRelations = null;
+      matrixLoaded = { 'obj-gr': false, 'matrix': false, 'courses': false };
+      objGrRelations = null; sicRelations = null; cvCourses = [];
       await loadCurriculum(vId);
       document.getElementById('header-list').classList.add('hidden');
       document.getElementById('header-detail').classList.remove('hidden');
@@ -210,12 +213,13 @@ nav.render('curriculum');
 
   function switchTab(tab) {
     activeTab = tab;
-    ['objectives','gr','grs','obj-gr','matrix'].forEach(t => {
+    ['objectives','gr','grs','obj-gr','courses','matrix'].forEach(t => {
       document.getElementById('tab-' + t).classList.toggle('hidden', t !== tab);
       document.getElementById('tab-btn-' + t).classList.toggle('active', t === tab);
     });
-    if (tab === 'obj-gr'  && !matrixLoaded['obj-gr'])  loadObjGrMatrix();
-    if (tab === 'matrix'  && !matrixLoaded['matrix'])   loadSicMatrix();
+    if (tab === 'obj-gr'  && !matrixLoaded['obj-gr'])   loadObjGrMatrix();
+    if (tab === 'matrix'  && !matrixLoaded['matrix'])    loadSicMatrix();
+    if (tab === 'courses' && !matrixLoaded['courses'])   loadCvCourses();
   }
 
   async function loadCurriculum(vId) {
@@ -236,9 +240,10 @@ nav.render('curriculum');
     renderGROnly(data.graduationRequirements || []);
     renderGR(data.graduationRequirements || []);
 
-    // 若矩阵标签当前可见则刷新
-    if (activeTab === 'obj-gr') { matrixLoaded['obj-gr'] = false; loadObjGrMatrix(); }
-    if (activeTab === 'matrix') { matrixLoaded['matrix'] = false; loadSicMatrix(); }
+    // 若对应标签当前可见则刷新
+    if (activeTab === 'obj-gr')  { matrixLoaded['obj-gr']  = false; loadObjGrMatrix(); }
+    if (activeTab === 'matrix')  { matrixLoaded['matrix']  = false; loadSicMatrix(); }
+    if (activeTab === 'courses') { matrixLoaded['courses'] = false; loadCvCourses(); }
   }
 
   function renderStats(data) {
@@ -500,62 +505,82 @@ nav.render('curriculum');
   }
 
   /* ═══════════════════════════════════════════════════════
-     Tab 3: 培养目标 ↔ 毕业要求 矩阵
+     Tab 3: 毕业要求 ↔ 毕业指标点 权重矩阵
   ════════════════════════════════════════════════════════ */
 
   async function loadObjGrMatrix() {
     const wrap = document.getElementById('obj-gr-matrix-wrap');
     if (!currentVersionData) return;
 
-    const objectives = currentVersionData.objectives || [];
-    const grs        = currentVersionData.graduationRequirements || [];
+    const grs = currentVersionData.graduationRequirements || [];
+    const allIndicators = grs.flatMap(g => g.indicators || []);
 
-    if (!objectives.length || !grs.length) {
+    if (!grs.length || !allIndicators.length) {
       wrap.innerHTML = `<div class="empty-state" style="padding:32px 0">
         <div class="empty-state-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="3" x2="9" y2="21"/></svg></div>
-        <p class="empty-state-title">请先在「培养目标」和「毕业要求」标签页中录入数据</p>
+        <p class="empty-state-title">请先在「毕业指标点」标签页中录入毕业要求及其指标点</p>
+        <p class="empty-state-desc">毕业要求：${grs.length} 条 &nbsp;|&nbsp; 指标点：${allIndicators.length} 个</p>
       </div>`;
       matrixLoaded['obj-gr'] = true;
       return;
     }
 
-    try {
-      const { relations } = await api.curriculum.objGrMatrix(currentVersionId);
-      objGrRelations = new Set(relations.map(r => `${r.objective_id}_${r.gr_id}`));
-      renderObjGrMatrix(objectives, grs);
-      matrixLoaded['obj-gr'] = true;
-    } catch(e) { toast.error('加载矩阵失败：' + e.message); }
+    renderObjGrMatrix(grs);
+    matrixLoaded['obj-gr'] = true;
   }
 
-  function renderObjGrMatrix(objectives, grs) {
+  function renderObjGrMatrix(grs) {
     const wrap = document.getElementById('obj-gr-matrix-wrap');
-    const objCols = objectives.map(o => `
-      <th class="vtxt" title="${o.description}">
-        <div style="display:flex;flex-direction:column;align-items:center;gap:3px">
-          <span style="font-size:10px;font-weight:700;color:var(--color-primary-600)">${o.code}</span>
-        </div>
-      </th>
-    `).join('');
 
+    // 扁平化所有指标点（列头）
+    const allIndicators = grs.flatMap(g =>
+      (g.indicators || []).map(ind => ({ ...ind, grId: g.id, grCode: g.code }))
+    );
+
+    // 列头：两行 —— 第一行按GR分组，第二行列出指标点编号（竖排）
+    let grGroupRow = `<th rowspan="2" style="min-width:240px;padding-bottom:8px;text-align:left;vertical-align:bottom;font-size:12px;color:var(--color-neutral-500)">毕业要求 \\ 指标点</th>`;
+    let indColRow  = '';
+
+    grs.forEach(gr => {
+      const inds = gr.indicators || [];
+      if (!inds.length) return;
+      grGroupRow += `<th colspan="${inds.length}" style="text-align:center;font-size:11px;font-weight:700;color:var(--color-primary-700);background:var(--color-primary-50) !important;border-radius:4px;padding:3px 4px !important">${gr.code}</th>`;
+      inds.forEach(ind => {
+        indColRow += `<th class="vtxt" title="${ind.description}" style="min-width:48px">
+          <span style="font-size:10px;font-weight:700;color:var(--color-neutral-600)">${ind.code}</span>
+        </th>`;
+      });
+    });
+
+    // 行：每条毕业要求一行，列出其各指标点的权重
     const bodyRows = grs.map(gr => {
-      const cells = objectives.map(obj => {
-        const key = `${obj.id}_${gr.id}`;
-        const on  = objGrRelations.has(key);
+      const inds = gr.indicators || [];
+      const weightSum = inds.reduce((s, ind) => s + (Number(ind.weight) || 0), 0);
+      const isOk = Math.abs(weightSum - 1) < 0.01;
+
+      const cells = allIndicators.map(ind => {
+        if (ind.grId === gr.id) {
+          const w = Number(ind.weight) || 0;
+          const alpha = Math.min(1, w / 0.5);
+          const bg = `rgba(37,99,235,${(alpha * 0.75 + 0.12).toFixed(2)})`;
+          const fg = alpha > 0.5 ? '#fff' : 'var(--color-primary-700)';
+          return `<td style="padding:3px;text-align:center">
+            <div style="width:44px;height:36px;border-radius:6px;background:${bg};color:${fg};font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;margin:auto" title="${ind.code} 权重：${w}">
+              ${w > 0 ? w.toFixed(2).replace(/\.?0+$/, '') : '—'}
+            </div>
+          </td>`;
+        }
         return `<td style="padding:3px;text-align:center">
-          <button class="mcell ${on ? 'on' : 'off'}"
-            data-oid="${obj.id}" data-gid="${gr.id}"
-            title="${obj.code} ↔ ${gr.code}"
-            onclick="toggleObjGr(${obj.id},${gr.id},this)">
-            ${on ? '√' : ''}
-          </button>
+          <div style="width:44px;height:36px;border-radius:6px;background:var(--color-neutral-50);display:flex;align-items:center;justify-content:center;margin:auto;color:var(--color-neutral-200);font-size:13px">·</div>
         </td>`;
       }).join('');
 
       return `<tr>
         <th style="padding:6px 16px 6px 0;border-bottom:1px solid var(--color-border-subtle)">
           <div style="display:flex;align-items:flex-start;gap:8px">
-            <span style="flex-shrink:0;padding:1px 6px;border-radius:4px;background:var(--color-primary-100);color:var(--color-primary-700);font-size:10px;font-weight:700;font-family:monospace">${gr.code}</span>
-            <span style="font-size:12px;color:var(--color-neutral-600);line-height:1.5;max-width:220px">${gr.description}</span>
+            <span style="flex-shrink:0;padding:1px 6px;border-radius:4px;background:var(--color-primary-600);color:#fff;font-size:10px;font-weight:700;font-family:monospace;white-space:nowrap">${gr.code}</span>
+            <span style="font-size:12px;color:var(--color-neutral-600);line-height:1.5;max-width:160px">${gr.description}</span>
+            <span style="flex-shrink:0;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:600;background:${isOk ? '#f0fdf4' : '#fffbeb'};color:${isOk ? '#15803d' : '#b45309'};border:1px solid ${isOk ? '#bbf7d0' : '#fde68a'}" title="权重合计">∑${weightSum.toFixed(2)}</span>
           </div>
         </th>
         ${cells}
@@ -566,41 +591,171 @@ nav.render('curriculum');
       <div class="matrix-outer">
         <table class="matrix-tbl">
           <thead>
-            <tr>
-              <th style="min-width:280px;padding-bottom:8px;text-align:left;font-size:12px;color:var(--color-neutral-500)">毕业要求 \\ 培养目标</th>
-              ${objCols}
-            </tr>
+            <tr>${grGroupRow}</tr>
+            <tr>${indColRow}</tr>
           </thead>
           <tbody>${bodyRows}</tbody>
         </table>
       </div>
-      <p style="font-size:11px;color:var(--color-neutral-400);margin-top:12px">
-        <span style="display:inline-block;width:14px;height:14px;border-radius:3px;background:var(--color-primary-600);vertical-align:middle;margin-right:4px"></span>
-        √ 表示该毕业要求支撑对应培养目标，点击切换
-      </p>
+      <div style="display:flex;align-items:center;gap:16px;margin-top:12px;flex-wrap:wrap">
+        <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--color-neutral-400)">
+          <span style="display:inline-block;width:32px;height:16px;border-radius:3px;background:rgba(37,99,235,0.87)"></span>高权重（≥ 0.5）
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--color-neutral-400)">
+          <span style="display:inline-block;width:32px;height:16px;border-radius:3px;background:rgba(37,99,235,0.30)"></span>低权重（< 0.5）
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--color-neutral-400)">
+          <span style="display:inline-block;width:32px;height:16px;border-radius:3px;background:#f0fdf4;border:1px solid #bbf7d0"></span>∑ = 1.00 权重达标
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--color-neutral-400)">
+          <span style="display:inline-block;width:32px;height:16px;border-radius:3px;background:#fffbeb;border:1px solid #fde68a"></span>∑ ≠ 1.00 权重未达标
+        </div>
+      </div>
     `;
   }
 
-  async function toggleObjGr(objId, grId, btn) {
-    const key = `${objId}_${grId}`;
-    const isOn = objGrRelations.has(key);
+  /* ═══════════════════════════════════════════════════════
+     Tab 4: 课程管理
+  ════════════════════════════════════════════════════════ */
+
+  const cvNatureMap   = { required:'必修', elective:'选修', practice:'实践' };
+  const cvNatureBadge = { required:'badge-primary', elective:'badge-neutral', practice:'badge-success' };
+
+  async function loadCvCourses() {
+    if (!currentVersionId) return;
     try {
-      if (isOn) {
-        await api.curriculum.removeObjGrSupport({ objective_id: objId, gr_id: grId });
-        objGrRelations.delete(key);
-        btn.className = 'mcell off';
-        btn.textContent = '';
-      } else {
-        await api.curriculum.saveObjGrSupport({ objective_id: objId, gr_id: grId });
-        objGrRelations.add(key);
-        btn.className = 'mcell on';
-        btn.textContent = '√';
+      cvCourses = await api.courses.list(currentVersionId);
+      renderCvSemesterBar();
+      renderCvTable(cvCourses);
+      matrixLoaded['courses'] = true;
+    } catch(e) { toast.error('加载课程失败：' + e.message); }
+  }
+
+  function renderCvSemesterBar() {
+    const bar = document.getElementById('cv-semester-bar');
+    const sems = [...new Set(cvCourses.map(c => c.semester).filter(Boolean))].sort((a,b) => a-b);
+    bar.innerHTML = `<span style="font-size:11px;color:var(--color-neutral-400);margin-right:4px">学期：</span>
+      <button class="tab-item active" onclick="cvFilterSemester(null,this)">全部</button>
+      ${sems.map(s => `<button class="tab-item" onclick="cvFilterSemester(${s},this)">第${s}学期</button>`).join('')}`;
+    bar.classList.remove('hidden');
+  }
+
+  function cvFilterSemester(sem, btn) {
+    document.querySelectorAll('#cv-semester-bar .tab-item').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderCvTable(sem === null ? cvCourses : cvCourses.filter(c => c.semester == sem));
+  }
+
+  function renderCvTable(courses) {
+    const pills = document.getElementById('cv-summary-pills');
+    if (courses.length) {
+      pills.classList.remove('hidden');
+      document.getElementById('cv-sum-count').textContent   = `${courses.length} 门课程`;
+      document.getElementById('cv-sum-credits').textContent = `${courses.reduce((s,c)=>s+(+c.credits||0),0).toFixed(1)} 学分`;
+      document.getElementById('cv-sum-hours').textContent   = `${courses.reduce((s,c)=>s+(+c.total_hours||0),0)} 学时`;
+      document.getElementById('cv-sum-core').textContent    = `${courses.filter(c=>c.is_core).length} 门核心课`;
+    } else {
+      pills.classList.add('hidden');
+    }
+    const tbody = document.getElementById('cv-courses-tbody');
+    if (!courses.length) {
+      tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state" style="padding:32px 0">
+        <div class="empty-state-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg></div>
+        <p class="empty-state-title">暂无课程</p><p class="empty-state-desc">点击右上角「添加课程」开始配置</p>
+      </div></td></tr>`;
+      return;
+    }
+    tbody.innerHTML = courses.map(c => `
+      <tr>
+        <td><code style="font-size:12px;color:var(--color-neutral-500);background:var(--color-neutral-100);padding:2px 6px;border-radius:4px">${c.code}</code></td>
+        <td>
+          <div class="flex items-center gap-2">
+            <span style="font-size:13px;font-weight:600;color:var(--color-neutral-800)">${c.name}</span>
+            ${c.course_group ? `<span class="badge badge-neutral" style="font-size:10px">${c.course_group}</span>` : ''}
+          </div>
+        </td>
+        <td class="text-center" style="font-size:13px;font-weight:600;font-variant-numeric:tabular-nums">${c.credits}</td>
+        <td class="text-center" style="font-size:13px;color:var(--color-neutral-600);font-variant-numeric:tabular-nums">${c.total_hours}</td>
+        <td class="text-center" style="font-size:12px;color:var(--color-neutral-400);font-variant-numeric:tabular-nums">${c.theory_hours} / ${c.practice_hours}</td>
+        <td class="text-center"><span class="badge ${cvNatureBadge[c.nature]||'badge-neutral'}">${cvNatureMap[c.nature]||c.nature}</span></td>
+        <td class="text-center" style="font-size:13px;color:var(--color-neutral-600)">第 ${c.semester} 学期</td>
+        <td class="text-center">
+          ${c.is_core
+            ? `<svg width="16" height="16" viewBox="0 0 24 24" fill="#f59e0b" stroke="#f59e0b" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" style="display:inline"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`
+            : `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#e2e8f0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="display:inline"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`
+          }
+        </td>
+        <td class="text-right">
+          <div style="display:flex;justify-content:flex-end;gap:4px">
+            <button onclick='cvEditCourse(${JSON.stringify(c).replace(/'/g,"&#39;")})' class="btn btn-ghost btn-sm btn-icon" aria-label="编辑">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            </button>
+            <button onclick="cvDeleteCourse(${c.id},'${c.name.replace(/'/g,"\\'")}')" class="btn btn-ghost btn-sm btn-icon" style="color:var(--color-error)" aria-label="删除">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
+            </button>
+          </div>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  const cvCourseFields = (d = {}) => [
+    { name:'code',           label:'课程编号', required:true, placeholder:'CS001',    default:d.code },
+    { name:'name',           label:'课程名称', required:true, placeholder:'软件工程',  default:d.name },
+    { name:'credits',        label:'学分',     type:'number', required:true,           default:d.credits||3 },
+    { name:'total_hours',    label:'总学时',   type:'number', default:d.total_hours||54 },
+    { name:'theory_hours',   label:'理论学时', type:'number', default:d.theory_hours||36 },
+    { name:'practice_hours', label:'实践学时', type:'number', default:d.practice_hours||18 },
+    { name:'nature',  label:'课程性质', type:'select',
+      options:[{value:'required',label:'必修'},{value:'elective',label:'选修'},{value:'practice',label:'实践'}],
+      default:d.nature||'required' },
+    { name:'semester',     label:'开课学期', type:'number', default:d.semester||1 },
+    { name:'is_core',      label:'核心课程', type:'select',
+      options:[{value:'0',label:'否'},{value:'1',label:'是'}], default:d.is_core?'1':'0' },
+    { name:'course_group', label:'课程组', placeholder:'如：专业核心课', default:d.course_group||'' },
+  ];
+
+  function cvAddCourse() {
+    if (!currentVersionId) return;
+    modal.form({ title:'添加课程', fields:cvCourseFields(), submitText:'添加课程', size:'lg',
+      onSubmit: async (data, close) => {
+        try {
+          await api.courses.create({ ...data, version_id: currentVersionId });
+          close(); toast.success('课程已添加');
+          matrixLoaded['courses'] = false; loadCvCourses();
+          // 同步 currentVersionData 里的课程（矩阵 tab 下次打开会重新加载）
+          matrixLoaded['matrix'] = false;
+        } catch(e) { toast.error(e.message); }
       }
-    } catch(e) { toast.error('保存失败：' + e.message); }
+    });
+  }
+
+  function cvEditCourse(c) {
+    modal.form({ title:'编辑课程', fields:cvCourseFields(c), submitText:'保存更改', size:'lg',
+      onSubmit: async (data, close) => {
+        try {
+          await api.courses.update(c.id, data);
+          close(); toast.success('保存成功');
+          matrixLoaded['courses'] = false; loadCvCourses();
+          matrixLoaded['matrix'] = false;
+        } catch(e) { toast.error(e.message); }
+      }
+    });
+  }
+
+  async function cvDeleteCourse(id, name) {
+    const ok = await modal.confirm(`确定删除课程「<strong>${name}</strong>」？此操作不可恢复。`, { danger:true });
+    if (!ok) return;
+    try {
+      await api.courses.remove(id);
+      toast.success('删除成功');
+      matrixLoaded['courses'] = false; loadCvCourses();
+      matrixLoaded['matrix'] = false;
+    } catch(e) { toast.error(e.message); }
   }
 
   /* ═══════════════════════════════════════════════════════
-     Tab 4: 毕业要求实现矩阵（课程 × 指标点）
+     Tab 5: 毕业要求实现矩阵（课程 × 指标点）
   ════════════════════════════════════════════════════════ */
 
   async function loadSicMatrix() {
@@ -622,8 +777,18 @@ nav.render('curriculum');
     }
 
     try {
-      const { relations } = await api.curriculum.supportMatrix(currentVersionId);
-      sicRelations = new Set(relations.map(r => `${r.indicator_id}_${r.course_id}`));
+      const data = await api.curriculum.supportMatrix(currentVersionId);
+      // 用 Map 存储权重，key = "indId_courseId"
+      sicRelations = new Map(data.relations.map(r => [`${r.indicator_id}_${r.course_id}`, r.weight]));
+      // 同步 HML 权重配置
+      hmlWeight.H = data.hml_weight_h ?? 1.0;
+      hmlWeight.M = data.hml_weight_m ?? 0.6;
+      hmlWeight.L = data.hml_weight_l ?? 0.3;
+      hmlCycle[1] = hmlWeight.H;
+      hmlCycle[2] = hmlWeight.M;
+      hmlCycle[3] = hmlWeight.L;
+      // 同步数据库中保存的模式
+      applySicModeUI(data.matrix_mode || 'check');
       renderSicMatrix(grs, allIndicators, courses);
       matrixLoaded['matrix'] = true;
     } catch(e) { toast.error('加载矩阵失败：' + e.message); }
@@ -649,13 +814,23 @@ nav.render('curriculum');
 
     const bodyRows = courses.map(course => {
       const cells = allIndicators.map(ind => {
-        const key = `${ind.id}_${course.id}`;
-        const on  = sicRelations.has(key);
+        const key    = `${ind.id}_${course.id}`;
+        const weight = sicRelations.get(key);   // undefined = 无关联
+        let cls, label;
+        if (sicMode === 'hml') {
+          if (weight === undefined) { cls = 'off'; label = ''; }
+          else if (weight >= 0.9)  { cls = 'H';   label = 'H'; }
+          else if (weight >= 0.5)  { cls = 'M';   label = 'M'; }
+          else                     { cls = 'L';   label = 'L'; }
+        } else {
+          cls   = weight !== undefined ? 'on' : 'off';
+          label = weight !== undefined ? '√'  : '';
+        }
         return `<td style="padding:3px;text-align:center">
-          <button class="mcell ${on ? 'on' : 'off'}"
+          <button class="mcell ${cls}"
             title="${course.name} ↔ ${ind.code}"
             onclick="toggleSic(${ind.id},${course.id},this)">
-            ${on ? '√' : ''}
+            ${label}
           </button>
         </td>`;
       }).join('');
@@ -673,6 +848,14 @@ nav.render('curriculum');
       </tr>`;
     }).join('');
 
+    const legendCheck = `<p style="font-size:11px;color:var(--color-neutral-400);margin-top:12px">
+      <span style="display:inline-block;width:14px;height:14px;border-radius:3px;background:var(--color-primary-600);vertical-align:middle;margin-right:4px"></span>
+      √ 表示该课程支撑对应指标点，点击切换 &nbsp;|&nbsp; 蓝色实心点表示核心课程
+    </p>`;
+    const legendHml = `<p style="font-size:11px;color:var(--color-neutral-400);margin-top:12px">
+      点击单元格循环切换：<strong style="color:var(--color-neutral-600)">无 → H（高）→ M（中）→ L（低）→ 无</strong> &nbsp;|&nbsp; 蓝色实心点表示核心课程
+    </p>`;
+
     wrap.innerHTML = `
       <div class="matrix-outer">
         <table class="matrix-tbl">
@@ -683,29 +866,131 @@ nav.render('curriculum');
           <tbody>${bodyRows}</tbody>
         </table>
       </div>
-      <p style="font-size:11px;color:var(--color-neutral-400);margin-top:12px">
-        <span style="display:inline-block;width:14px;height:14px;border-radius:3px;background:var(--color-primary-600);vertical-align:middle;margin-right:4px"></span>
-        √ 表示该课程支撑对应指标点，点击切换 &nbsp;|&nbsp; 蓝色实心点表示核心课程
-      </p>
+      ${sicMode === 'hml' ? legendHml : legendCheck}
     `;
+  }
+
+  // 仅更新 UI，不触发 API
+  function applySicModeUI(mode) {
+    sicMode = mode;
+    const btnCheck = document.getElementById('sic-mode-btn-check');
+    const btnHml   = document.getElementById('sic-mode-btn-hml');
+    const legend   = document.getElementById('sic-hml-legend');
+    if (btnCheck) btnCheck.classList.toggle('active', mode === 'check');
+    if (btnHml)   btnHml.classList.toggle('active',   mode === 'hml');
+    if (legend)   legend.style.display = mode === 'hml' ? 'flex' : 'none';
+    if (mode === 'hml') updateHmlBadges();
+  }
+
+  // 切换模式：更新 UI + 持久化到 DB + 重渲染
+  async function switchSicMode(mode) {
+    if (!currentVersionId) return;
+    applySicModeUI(mode);
+    if (sicRelations) {
+      // 重新渲染（需要拿到 grs/indicators/courses，直接从 currentVersionData 取）
+      const grs = currentVersionData.graduationRequirements || [];
+      const allIndicators = grs.flatMap(g => (g.indicators||[]).map(ind => ({ ...ind, grCode: g.code })));
+      const courses = (currentVersionData.courses || []).sort((a,b) => (a.semester||0)-(b.semester||0) || (a.name||'').localeCompare(b.name||''));
+      renderSicMatrix(grs, allIndicators, courses);
+    }
+    try {
+      await api.curriculum.updateVersion(currentVersionId, { matrix_mode: mode });
+    } catch(e) { toast.error('模式保存失败：' + e.message); }
+  }
+
+  let hmlCycle  = [undefined, 1.0, 0.6, 0.3]; // undefined = 无关联
+  let hmlWeight = { H: 1.0, M: 0.6, L: 0.3 };
+
+  function updateHmlBadges() {
+    const bh = document.getElementById('hml-badge-h');
+    const bm = document.getElementById('hml-badge-m');
+    const bl = document.getElementById('hml-badge-l');
+    if (bh) bh.textContent = `H=${hmlWeight.H}`;
+    if (bm) bm.textContent = `M=${hmlWeight.M}`;
+    if (bl) bl.textContent = `L=${hmlWeight.L}`;
+  }
+
+  function openHmlWeightSettings() {
+    modal.form({
+      title: 'HML 权重配置',
+      fields: [
+        { name:'h', label:'H（高）权重', type:'number', required:true, default: hmlWeight.H, placeholder:'0.0 ~ 1.0' },
+        { name:'m', label:'M（中）权重', type:'number', required:true, default: hmlWeight.M, placeholder:'0.0 ~ 1.0' },
+        { name:'l', label:'L（低）权重', type:'number', required:true, default: hmlWeight.L, placeholder:'0.0 ~ 1.0' },
+      ],
+      submitText: '保存',
+      onSubmit: async (data, close) => {
+        const h = parseFloat(data.h), m = parseFloat(data.m), l = parseFloat(data.l);
+        if ([h,m,l].some(v => isNaN(v) || v < 0 || v > 1)) {
+          toast.warning('权重值须在 0 ~ 1 之间'); return;
+        }
+        hmlWeight.H = h; hmlWeight.M = m; hmlWeight.L = l;
+        hmlCycle[1] = h; hmlCycle[2] = m; hmlCycle[3] = l;
+        updateHmlBadges();
+        close();
+        // 持久化到 DB
+        try {
+          await api.curriculum.updateVersion(currentVersionId, { hml_weight_h: h, hml_weight_m: m, hml_weight_l: l });
+          toast.success('HML 权重已保存');
+        } catch(e) { toast.error('保存失败：' + e.message); }
+      }
+    });
   }
 
   async function toggleSic(indId, courseId, btn) {
     const key = `${indId}_${courseId}`;
+    if (sicMode === 'hml') {
+      await toggleSicHml(indId, courseId, btn, key);
+    } else {
+      await toggleSicCheck(indId, courseId, btn, key);
+    }
+  }
+
+  async function toggleSicCheck(indId, courseId, btn, key) {
     const isOn = sicRelations.has(key);
+    const prevCls = btn.className; const prevTxt = btn.textContent;
     try {
       if (isOn) {
+        btn.className = 'mcell off'; btn.textContent = '';
         await api.curriculum.removeSupport({ indicator_id: indId, course_id: courseId });
         sicRelations.delete(key);
-        btn.className = 'mcell off';
-        btn.textContent = '';
       } else {
-        await api.curriculum.saveSupport({ indicator_id: indId, course_id: courseId, weight: 1 });
-        sicRelations.add(key);
-        btn.className = 'mcell on';
-        btn.textContent = '√';
+        btn.className = 'mcell on'; btn.textContent = '√';
+        await api.curriculum.saveSupport({ indicator_id: indId, course_id: courseId, weight: 1.0 });
+        sicRelations.set(key, 1.0);
       }
-    } catch(e) { toast.error('保存失败：' + e.message); }
+    } catch(e) {
+      toast.error('保存失败：' + e.message);
+      btn.className = prevCls; btn.textContent = prevTxt;
+    }
+  }
+
+  async function toggleSicHml(indId, courseId, btn, key) {
+    const curWeight = sicRelations.get(key); // undefined | 1.0 | 0.6 | 0.3
+    const idx  = hmlCycle.indexOf(curWeight);
+    const next = hmlCycle[(idx + 1) % hmlCycle.length];
+    const prevCls = btn.className; const prevTxt = btn.textContent;
+
+    let nextCls, nextLabel;
+    if (next === undefined)     { nextCls = 'off'; nextLabel = ''; }
+    else if (next >= 0.9)       { nextCls = 'H';   nextLabel = 'H'; }
+    else if (next >= 0.5)       { nextCls = 'M';   nextLabel = 'M'; }
+    else                        { nextCls = 'L';   nextLabel = 'L'; }
+
+    btn.className = `mcell ${nextCls}`; btn.textContent = nextLabel;
+
+    try {
+      if (next === undefined) {
+        await api.curriculum.removeSupport({ indicator_id: indId, course_id: courseId });
+        sicRelations.delete(key);
+      } else {
+        await api.curriculum.saveSupport({ indicator_id: indId, course_id: courseId, weight: next });
+        sicRelations.set(key, next);
+      }
+    } catch(e) {
+      toast.error('保存失败：' + e.message);
+      btn.className = prevCls; btn.textContent = prevTxt;
+    }
   }
 
   /* ═══════════════════════════════════════════════════════

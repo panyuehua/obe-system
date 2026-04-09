@@ -247,19 +247,28 @@ router.get('/versions/:id', (req, res) => {
   success(res, { ...version, objectives, graduationRequirements: grTree, courses });
 });
 
-// PUT /api/curriculum/versions/:id — 更新版本基本信息（含状态切换）
+// PUT /api/curriculum/versions/:id — 更新版本基本信息（含状态切换、矩阵模式）
 router.put('/versions/:id', (req, res) => {
   const version = db.prepare('SELECT id FROM curriculum_versions WHERE id = ?').get(req.params.id);
   if (!version) return notFound(res, '培养方案版本不存在');
-  const { grade_year, version: versionName, status } = req.body;
+  const { grade_year, version: versionName, status, matrix_mode,
+          hml_weight_h, hml_weight_m, hml_weight_l } = req.body;
   db.prepare(`
     UPDATE curriculum_versions SET
       grade_year   = COALESCE(?, grade_year),
       version      = COALESCE(?, version),
       status       = COALESCE(?, status),
+      matrix_mode  = COALESCE(?, matrix_mode),
+      hml_weight_h = COALESCE(?, hml_weight_h),
+      hml_weight_m = COALESCE(?, hml_weight_m),
+      hml_weight_l = COALESCE(?, hml_weight_l),
       updated_at   = datetime('now','localtime')
     WHERE id = ?
-  `).run(grade_year || null, versionName || null, status || null, req.params.id);
+  `).run(
+    grade_year || null, versionName || null, status || null, matrix_mode || null,
+    hml_weight_h ?? null, hml_weight_m ?? null, hml_weight_l ?? null,
+    req.params.id
+  );
   success(res, db.prepare('SELECT * FROM curriculum_versions WHERE id = ?').get(req.params.id));
 });
 
@@ -489,6 +498,9 @@ router.delete('/gr/:id', (req, res) => {
 // GET /api/curriculum/versions/:id/support-matrix
 router.get('/versions/:id/support-matrix', (req, res) => {
   const { id: versionId } = req.params;
+  const version = db.prepare('SELECT matrix_mode, hml_weight_h, hml_weight_m, hml_weight_l FROM curriculum_versions WHERE id = ?').get(versionId);
+  if (!version) return notFound(res, '培养方案版本不存在');
+
   const indicators = db.prepare(`
     SELECT gri.id, gri.code, gr.code AS gr_code FROM gr_indicators gri
     JOIN graduation_requirements gr ON gri.gr_id = gr.id
@@ -503,7 +515,15 @@ router.get('/versions/:id/support-matrix', (req, res) => {
     WHERE c.version_id = ?
   `).all(versionId);
 
-  success(res, { indicators, courses, relations });
+  success(res, {
+    indicators,
+    courses,
+    relations,
+    matrix_mode:  version.matrix_mode  || 'check',
+    hml_weight_h: version.hml_weight_h ?? 1.0,
+    hml_weight_m: version.hml_weight_m ?? 0.6,
+    hml_weight_l: version.hml_weight_l ?? 0.3,
+  });
 });
 
 // POST /api/curriculum/support — 保存单条支撑关系

@@ -4,8 +4,48 @@
 nav.render('matrix');
 
 let matrixData = { indicators: [], courses: [], relations: [] };
+
+// 模式：'check'（简单√支撑）或 'hml'（高中低强度）
+let cellMode = 'check';
+let currentVersionId = null;   // 当前已加载的版本 ID，用于保存 mode
+
 const strengthCycle = [null, 'H', 'M', 'L'];
 const strengthWeight = { H: 1.0, M: 0.6, L: 0.3 };
+
+function applyModeUI(mode) {
+  cellMode = mode;
+  document.getElementById('mode-btn-check').classList.toggle('active', mode === 'check');
+  document.getElementById('mode-btn-hml').classList.toggle('active', mode === 'hml');
+  const legend = document.getElementById('hml-legend');
+  if (mode === 'hml') legend.classList.remove('hidden');
+  else legend.classList.add('hidden');
+  updateInfoBar();
+}
+
+async function switchMode(mode) {
+  applyModeUI(mode);
+  if (matrixData.indicators.length) renderMatrix();
+  // 持久化到数据库（版本粒度）
+  if (currentVersionId) {
+    try {
+      await api.curriculum.updateVersion(currentVersionId, { matrix_mode: mode });
+    } catch(e) {
+      toast.error('模式保存失败：' + e.message);
+    }
+  }
+}
+
+function updateInfoBar() {
+  const bar = document.getElementById('info-bar');
+  const txt = document.getElementById('info-bar-text');
+  if (!matrixData.indicators.length) return;
+  bar.classList.remove('hidden');
+  if (cellMode === 'check') {
+    txt.innerHTML = '当前为 <strong>简单支撑</strong> 模式：点击单元格切换 <strong>√ 支撑 ↔ 无</strong>，适合只需标注是否支撑的培养方案。更改实时保存。';
+  } else {
+    txt.innerHTML = '当前为 <strong>HML 强度</strong> 模式：点击单元格循环切换 <strong>无 → H（高）→ M（中）→ L（低）→ 无</strong>。更改实时保存。';
+  }
+}
 
 async function initVersionSelect() {
   const majors = await api.majors.list();
@@ -25,9 +65,11 @@ async function loadMatrix() {
   const vId = document.getElementById('version-select').value;
   if (!vId) return;
   try {
+    currentVersionId = vId;
     matrixData = await api.curriculum.supportMatrix(vId);
+    // 从 API 返回的 matrix_mode 同步 UI
+    applyModeUI(matrixData.matrix_mode || 'check');
     renderMatrix();
-    document.getElementById('info-bar').classList.remove('hidden');
   } catch(e) { toast.error(e.message); }
 }
 
@@ -96,14 +138,18 @@ function renderMatrix() {
                 ${courses.map(c => {
                   const strength = getStrength(ind.id, c.id);
                   const rel = getRelation(ind.id, c.id);
+                  const isCheck = cellMode === 'check';
+                  const hasRelation = !!rel;
+                  const cls  = isCheck ? (hasRelation ? 'check' : 'none') : (strength || 'none');
+                  const label = isCheck ? (hasRelation ? '√' : '') : (strength || '无');
                   return `
                     <td style="padding:2px;text-align:center">
-                      <button class="cell-btn ${strength || 'none'}"
+                      <button class="cell-btn ${cls}"
                         onclick="cycleCell(${ind.id}, ${c.id}, this)"
                         data-ind="${ind.id}" data-course="${c.id}"
                         data-tooltip="${c.name}: ${rel ? '权重 ' + rel.weight : '未关联'}"
                         aria-label="${ind.code} × ${c.code}">
-                        ${strength || '无'}
+                        ${label}
                       </button>
                     </td>`;
                 }).join('')}
@@ -116,12 +162,54 @@ function renderMatrix() {
 }
 
 async function cycleCell(indId, courseId, btn) {
+  if (cellMode === 'check') {
+    await cycleCellCheck(indId, courseId, btn);
+  } else {
+    await cycleCellHml(indId, courseId, btn);
+  }
+}
+
+async function cycleCellCheck(indId, courseId, btn) {
+  const hasSupport = btn.classList.contains('check');
+  // 切换：有支撑 → 无；无 → 有支撑
+  const next = !hasSupport;
+
+  const prevCls  = btn.className;
+  const prevText = btn.textContent.trim();
+
+  btn.className  = `cell-btn ${next ? 'check' : 'none'}`;
+  btn.textContent = next ? '√' : '';
+
+  try {
+    if (!next) {
+      await api.curriculum.removeSupport({ indicator_id: indId, course_id: courseId });
+      matrixData.relations = matrixData.relations.filter(r => !(r.indicator_id == indId && r.course_id == courseId));
+    } else {
+      const weight = 1.0;
+      await api.curriculum.saveSupport({ indicator_id: indId, course_id: courseId, weight });
+      const existing = matrixData.relations.find(r => r.indicator_id == indId && r.course_id == courseId);
+      if (existing) existing.weight = weight;
+      else matrixData.relations.push({ indicator_id: indId, course_id: courseId, weight });
+    }
+    updateStatsBar();
+    btn.setAttribute('data-tooltip', next ? '已支撑' : '未关联');
+  } catch(e) {
+    toast.error('保存失败：' + e.message);
+    btn.className  = prevCls;
+    btn.textContent = prevText;
+  }
+}
+
+async function cycleCellHml(indId, courseId, btn) {
   const current = btn.textContent.trim();
-  const currentStrength = current === '无' ? null : current;
+  const currentStrength = (current === '无' || current === '') ? null : current;
   const idx = strengthCycle.indexOf(currentStrength);
   const nextStrength = strengthCycle[(idx + 1) % strengthCycle.length];
 
-  btn.className = `cell-btn ${nextStrength || 'none'}`;
+  const prevCls  = btn.className;
+  const prevText = btn.textContent.trim();
+
+  btn.className  = `cell-btn ${nextStrength || 'none'}`;
   btn.textContent = nextStrength || '无';
 
   try {
@@ -135,16 +223,22 @@ async function cycleCell(indId, courseId, btn) {
       if (existing) existing.weight = weight;
       else matrixData.relations.push({ indicator_id: indId, course_id: courseId, weight });
     }
-
-    const filled = matrixData.relations.length;
-    const total = matrixData.indicators.length * matrixData.courses.length;
-    document.querySelector('#matrix-stats .badge-primary').textContent = `已配置 ${filled} / ${total}`;
+    updateStatsBar();
     btn.setAttribute('data-tooltip', nextStrength ? `权重 ${strengthWeight[nextStrength]}` : '未关联');
   } catch(e) {
     toast.error('保存失败：' + e.message);
-    btn.className = `cell-btn ${currentStrength || 'none'}`;
-    btn.textContent = currentStrength || '无';
+    btn.className  = prevCls;
+    btn.textContent = prevText;
   }
 }
 
+function updateStatsBar() {
+  const filled = matrixData.relations.length;
+  const total  = matrixData.indicators.length * matrixData.courses.length;
+  const badge  = document.querySelector('#matrix-stats .badge-primary');
+  if (badge) badge.textContent = `已配置 ${filled} / ${total}`;
+}
+
+// 初始化分段控件 UI（无版本时默认 check）
+applyModeUI('check');
 initVersionSelect();

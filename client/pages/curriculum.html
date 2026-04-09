@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
@@ -64,6 +64,21 @@
     .mcell.on  { background: var(--color-primary-600); color: #fff; }
     .mcell.off { background: var(--color-neutral-100); color: transparent; }
     .mcell.off:hover { background: var(--color-primary-100); }
+    /* HML 模式 */
+    .mcell.H   { background: var(--color-primary-600); color: #fff; font-size: 11px; }
+    .mcell.M   { background: var(--color-primary-200); color: var(--color-primary-700); font-size: 11px; }
+    .mcell.L   { background: var(--color-primary-50);  color: var(--color-primary-500); font-size: 11px; }
+    /* 模式分段控件 */
+    .sic-mode-seg { display:flex; background:var(--color-neutral-100); border-radius:8px; padding:3px; gap:2px; }
+    .sic-mode-seg button {
+      padding:4px 12px; border-radius:6px; border:none; cursor:pointer;
+      font-size:12px; font-weight:600; transition:all 0.2s;
+      color:var(--color-neutral-500); background:transparent;
+    }
+    .sic-mode-seg button.active {
+      background:#fff; color:var(--color-primary-600);
+      box-shadow:0 1px 4px rgba(0,0,0,0.12);
+    }
     .matrix-tbl td { padding: 3px; }
     .matrix-tbl tbody th {
       padding: 4px 16px 4px 0;
@@ -166,7 +181,8 @@
         <button class="tab-btn active" id="tab-btn-objectives" onclick="switchTab('objectives')">培养目标</button>
         <button class="tab-btn" id="tab-btn-gr" onclick="switchTab('gr')">毕业要求</button>
         <button class="tab-btn" id="tab-btn-grs" onclick="switchTab('grs')">毕业指标点</button>
-        <button class="tab-btn" id="tab-btn-obj-gr" onclick="switchTab('obj-gr')">目标-要求矩阵</button>
+        <button class="tab-btn" id="tab-btn-obj-gr" onclick="switchTab('obj-gr')">要求-指标点矩阵</button>
+        <button class="tab-btn" id="tab-btn-courses" onclick="switchTab('courses')">课程管理</button>
         <button class="tab-btn" id="tab-btn-matrix" onclick="switchTab('matrix')">毕业要求实现矩阵</button>
       </div>
 
@@ -226,15 +242,15 @@
           </div>
         </div>
 
-        <!-- ─── Tab: 目标-要求矩阵 ─── -->
+        <!-- ─── Tab: 毕业要求-指标点矩阵 ─── -->
         <div id="tab-obj-gr" class="hidden">
           <div class="card">
             <div class="card-header">
               <span class="card-title">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--color-primary-500)"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
-                培养目标 ↔ 毕业要求 支撑矩阵（表1）
+                毕业要求 ↔ 毕业指标点 权重矩阵
               </span>
-              <p style="font-size:12px;color:var(--color-neutral-400)">点击格子切换是否支撑，自动保存</p>
+              <p style="font-size:12px;color:var(--color-neutral-400)">纵轴为毕业要求，横轴为各指标点，单元格显示权重值</p>
             </div>
             <div class="card-body">
               <div id="obj-gr-matrix-wrap">
@@ -242,6 +258,51 @@
                   <p class="empty-state-title">加载中…</p>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ─── Tab: 课程管理 ─── -->
+        <div id="tab-courses" class="hidden">
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--color-primary-500)"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg>
+                本版本课程列表
+              </span>
+              <div class="flex items-center gap-2">
+                <div id="cv-summary-pills" class="hidden flex items-center gap-2" style="font-size:11px">
+                  <span id="cv-sum-count"   class="badge badge-neutral"></span>
+                  <span id="cv-sum-credits" class="badge badge-neutral"></span>
+                  <span id="cv-sum-hours"   class="badge badge-neutral"></span>
+                  <span id="cv-sum-core"    class="badge badge-primary"></span>
+                </div>
+                <button onclick="cvAddCourse()" class="btn btn-primary btn-sm">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                  添加课程
+                </button>
+              </div>
+            </div>
+            <!-- 学期筛选 -->
+            <div id="cv-semester-bar" class="hidden px-4 pt-3 flex items-center gap-1 flex-wrap" style="border-bottom:1px solid var(--color-border-subtle);padding-bottom:12px">
+              <span style="font-size:11px;color:var(--color-neutral-400);margin-right:4px">学期：</span>
+              <button class="tab-item active" onclick="cvFilterSemester(null,this)">全部</button>
+            </div>
+            <div class="card-body" style="padding:0;overflow:auto">
+              <table class="data-table" style="min-width:780px">
+                <thead>
+                  <tr>
+                    <th>编号</th><th>课程名称</th>
+                    <th class="text-center">学分</th><th class="text-center">总学时</th>
+                    <th class="text-center">理论/实践</th><th class="text-center">性质</th>
+                    <th class="text-center">开课学期</th><th class="text-center">核心</th>
+                    <th class="text-right">操作</th>
+                  </tr>
+                </thead>
+                <tbody id="cv-courses-tbody">
+                  <tr><td colspan="9"><div class="empty-state" style="padding:32px 0"><p class="empty-state-title">加载中…</p></div></td></tr>
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -254,7 +315,22 @@
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--color-primary-500)"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
                 毕业要求实现矩阵（附表）
               </span>
-              <p style="font-size:12px;color:var(--color-neutral-400)">课程 × 指标点，点击格子切换支撑关系</p>
+              <div style="display:flex;align-items:center;gap:12px">
+                <!-- 模式切换 -->
+                <div class="sic-mode-seg" id="sic-mode-seg">
+                  <button id="sic-mode-btn-check" class="active" onclick="switchSicMode('check')">✓ 简单支撑</button>
+                  <button id="sic-mode-btn-hml"           onclick="switchSicMode('hml')">HML 强度</button>
+                </div>
+                <!-- HML 图例 + 权重设置 -->
+                <div id="sic-hml-legend" style="display:none;align-items:center;gap:6px;font-size:11px;color:var(--color-neutral-500)">
+                  <span id="hml-badge-h" style="display:inline-flex;align-items:center;justify-content:center;padding:0 6px;height:20px;border-radius:4px;background:var(--color-primary-600);color:#fff;font-size:9px;font-weight:700">H</span>高
+                  <span id="hml-badge-m" style="display:inline-flex;align-items:center;justify-content:center;padding:0 6px;height:20px;border-radius:4px;background:var(--color-primary-200);color:var(--color-primary-700);font-size:9px;font-weight:700;margin-left:6px">M</span>中
+                  <span id="hml-badge-l" style="display:inline-flex;align-items:center;justify-content:center;padding:0 6px;height:20px;border-radius:4px;background:var(--color-primary-50);color:var(--color-primary-500);font-size:9px;font-weight:700;margin-left:6px">L</span>低
+                  <button onclick="openHmlWeightSettings()" title="配置 HML 权重" style="margin-left:4px;display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:5px;border:1px solid var(--color-border-subtle);background:transparent;cursor:pointer;color:var(--color-neutral-400)" onmouseover="this.style.color='var(--color-primary-500)'" onmouseout="this.style.color='var(--color-neutral-400)'">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+                  </button>
+                </div>
+              </div>
             </div>
             <div class="card-body">
               <div id="sic-matrix-wrap">

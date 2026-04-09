@@ -30,14 +30,6 @@ const nav = (() => {
       </svg>`,
     },
     {
-      key: 'courses',
-      label: '课程管理',
-      href: '/pages/courses.html',
-      icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/>
-      </svg>`,
-    },
-    {
       key: 'matrix',
       label: '支撑矩阵',
       href: '/pages/matrix.html',
@@ -115,7 +107,7 @@ const nav = (() => {
         <nav class="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto overflow-x-hidden">
           <div class="nav-section-label">核心功能</div>
 
-          ${menuItems.slice(0, 4).map((item) => {
+          ${menuItems.slice(0, 3).map((item) => {
             const isActive = item.key === activeKey;
             return `
               <a href="${item.href}"
